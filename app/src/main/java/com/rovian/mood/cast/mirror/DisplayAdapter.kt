@@ -8,7 +8,7 @@ import android.os.Build
 import android.util.Log
 import android.view.Display
 import android.view.WindowManager
-import android.widget.VideoView
+import com.rovian.mood.ui.player.MoodVideoView
 import androidx.activity.ComponentActivity
 import com.rovian.mood.cast.AdapterAvailability
 import com.rovian.mood.cast.CastAdapter
@@ -52,7 +52,7 @@ sealed interface TvScene {
 
 /** Connects the TV-side VideoView back to the adapter. */
 class TvPlayerBridge {
-    @Volatile var view: VideoView? = null
+    @Volatile var view: MoodVideoView? = null
     var resumeAtMs: Long = 0
     var onPrepared: (durationMs: Long) -> Unit = {}
     var onCompleted: () -> Unit = {}

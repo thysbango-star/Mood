@@ -24,7 +24,7 @@ import com.rovian.mood.ui.theme.MoodColors
 enum class Glyph {
     Play, Pause, Next, Previous, Back10, Forward10, Shuffle, Repeat, RepeatOne,
     Volume, VolumeOff, Close, ChevronDown, Screen, Video, Photo, Music, Link, Mirror, Refresh, Stop,
-    Search, Home, Info, Wifi, ChevronRight,
+    Search, Home, Info, Wifi, ChevronRight, Library,
 }
 
 @Composable
@@ -92,6 +92,11 @@ private fun DrawScope.drawGlyph(g: Glyph, c: Color) {
         Glyph.Close -> {
             drawLine(c, Offset(6f, 6f), Offset(18f, 18f), 1.9f, StrokeCap.Round)
             drawLine(c, Offset(18f, 6f), Offset(6f, 18f), 1.9f, StrokeCap.Round)
+        }
+        Glyph.Library -> {
+            drawRoundRect(c, Offset(4f, 9f), Size(16f, 11f), CornerRadius(2.5f), style = line)
+            drawLine(c, Offset(6.5f, 6.2f), Offset(17.5f, 6.2f), 1.9f, StrokeCap.Round)
+            drawLine(c, Offset(8.5f, 3.4f), Offset(15.5f, 3.4f), 1.9f, StrokeCap.Round)
         }
         Glyph.ChevronRight -> drawPath(path { moveTo(9.5f, 6f); lineTo(15.5f, 12f); lineTo(9.5f, 18f) }, c, style = line)
         Glyph.ChevronDown -> drawPath(path { moveTo(6f, 9.5f); lineTo(12f, 15.5f); lineTo(18f, 9.5f) }, c, style = line)

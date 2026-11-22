@@ -3,7 +3,7 @@ package com.rovian.mood.ui.tv
 import android.graphics.Bitmap
 import android.net.Uri
 import android.view.Display
-import android.widget.VideoView
+import com.rovian.mood.ui.player.MoodVideoView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -230,14 +230,15 @@ private fun TvVideo(item: ResolvedMedia, token: Long, bridge: TvPlayerBridge, mo
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            VideoView(ctx).apply {
-                setOnPreparedListener { mp ->
+            // Rendered at the TV's own resolution; Enhance sharpens whatever is upscaled to fill it.
+            MoodVideoView(ctx).apply {
+                onPrepared = { d ->
                     if (bridge.resumeAtMs > 0) seekTo(bridge.resumeAtMs.toInt())
                     start()
-                    bridge.onPrepared(mp.duration.toLong())
+                    bridge.onPrepared(d.toLong())
                 }
-                setOnCompletionListener { bridge.onCompleted() }
-                setOnErrorListener { _, what, _ -> bridge.onError(what); true }
+                onCompletion = { bridge.onCompleted() }
+                onError = { what -> bridge.onError(what) }
                 bridge.view = this
             }
         },

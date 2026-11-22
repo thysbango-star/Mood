@@ -57,6 +57,14 @@ import com.rovian.mood.cast.hasSession
 import com.rovian.mood.cast.media.MediaResolver
 import com.rovian.mood.cast.mirror.DisplayAdapter
 import com.rovian.mood.cast.mirror.MediaSessionWatcher
+import com.rovian.mood.library.LibraryItem
+import com.rovian.mood.library.LibraryStore
+import com.rovian.mood.ui.library.LibraryScreen
+import com.rovian.mood.cast.MediaKind
+import android.net.Uri
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import com.rovian.mood.cast.mirror.SystemMirroring
 import com.rovian.mood.cast.CastProtocol
 import com.rovian.mood.catalog.CatalogHome
@@ -98,6 +106,7 @@ import com.rovian.mood.ui.troubleshoot.TroubleshootSheet
 
 enum class Tab(val label: String, val glyph: Glyph) {
     HOME("Home", Glyph.Home),
+    LIBRARY("Library", Glyph.Library),
     SEARCH("Search", Glyph.Search),
     SCREENS("Screens", Glyph.Screen),
 }
@@ -111,6 +120,7 @@ interface PlatformActions {
     fun openWifiSettings()
     fun replayIntro()
     fun enableMediaAccess()
+    fun addToLibrary()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -124,6 +134,7 @@ fun MoodShell(
     networkCheck: NetworkCheck,
     tvDisplay: DisplayAdapter,
     mediaWatcher: MediaSessionWatcher,
+    library: LibraryStore,
     platform: PlatformActions,
     showController: Boolean,
     onShowController: (Boolean) -> Unit,
@@ -146,7 +157,11 @@ fun MoodShell(
     var infoMovie by remember { mutableStateOf<Movie?>(null) }
     var pickFor by remember { mutableStateOf<Movie?>(null) }
     var pendingMovie by remember { mutableStateOf<Movie?>(null) }
-    var phoneMovie by remember { mutableStateOf<Movie?>(null) }
+    var phonePlayback by remember { mutableStateOf<PhonePlayback?>(null) }
+    var photo by remember { mutableStateOf<LibraryItem?>(null) }
+    var libraryItem by remember { mutableStateOf<LibraryItem?>(null) }
+    val libraryItems by library.items.collectAsState()
+    val importing by library.importing.collectAsState()
     var showTroubleshoot by remember { mutableStateOf(false) }
     var linkDialog by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -242,7 +257,12 @@ fun MoodShell(
                 engine.castMovie(full) // mirrored TV: play natively on it
                 onShowController(true)
             } else {
-                phoneMovie = full
+                phonePlayback = PhonePlayback(
+                    urls = full.streams.sortedBy { it.adaptive }.map { it.url },
+                    title = full.title,
+                    subtitle = full.meta(),
+                    handOff = { at -> engine.castMovie(full, startAtMs = at) },
+                )
             }
         }
     }
@@ -282,6 +302,14 @@ fun MoodShell(
                     onInfo = { infoMovie = it },
                     onChooseScreen = { watch(it, chooseScreen = true) },
                     onHeroChange = { ambientUrl = it.backdropUrl; tvDisplay.focus.value = it },
+                )
+                Tab.LIBRARY -> LibraryScreen(
+                    items = libraryItems,
+                    importing = importing,
+                    contentStart = contentStart,
+                    thumbnail = { resolver.artwork(it.toCastMedia()) },
+                    onAdd = platform::addToLibrary,
+                    onOpen = { libraryItem = it },
                 )
                 Tab.SEARCH -> SearchScreen(query, { query = it }, results, searchingCatalog, contentStart, onOpen = { infoMovie = it })
                 Tab.SCREENS -> ScreensScreen(
@@ -323,21 +351,27 @@ fun MoodShell(
                 },
             )
         }
-        phoneMovie?.let { m ->
+        phonePlayback?.let { pb ->
             val tvName = (connection as? ConnectionState.Connected)?.endpoint
                 ?.takeIf { it.protocol == CastProtocol.SCREEN }?.name
             PhonePlayer(
-                urls = m.streams.sortedBy { it.adaptive }.map { it.url },
-                title = m.title,
-                subtitle = m.meta(),
+                urls = pb.urls,
+                title = pb.title,
+                subtitle = pb.subtitle,
                 tvName = tvName,
                 onHandOffToTv = { at ->
-                    phoneMovie = null
-                    engine.castMovie(m, startAtMs = at)
+                    phonePlayback = null
+                    pb.handOff(at)
                     onShowController(true)
                 },
-                onClose = { phoneMovie = null },
+                onClose = { phonePlayback = null },
             )
+        }
+        photo?.let { item ->
+            val bmp by produceState<Bitmap?>(null, item.id) { value = resolver.artwork(item.toCastMedia()) }
+            Box(Modifier.fillMaxSize().background(Color.Black).clickable { photo = null }) {
+                bmp?.let { Image(it.asImageBitmap(), item.title, Modifier.fillMaxSize(), contentScale = ContentScale.Fit) }
+            }
         }
     }
 
@@ -398,6 +432,59 @@ fun MoodShell(
                     TextButton(onClick = { pickFor = null; showTroubleshoot = true }) { Text("Don't see your TV?", color = MoodColors.InkSecondary) }
                 }
                 Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    libraryItem?.let { item ->
+        ModalBottomSheet(onDismissRequest = { libraryItem = null }, containerColor = Color(0xFF17120F)) {
+            Column(Modifier.padding(horizontal = 24.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(item.title, color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                Text(
+                    listOfNotNull(item.kind.label, item.durationMs?.let { com.rovian.mood.ui.components.formatTime(it) }).joinToString(" · "),
+                    color = MoodColors.InkSecondary,
+                    fontSize = 14.sp,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        Modifier.clip(RoundedCornerShape(50)).background(Color.White).clickable(role = Role.Button) {
+                            libraryItem = null
+                            if (item.kind == MediaKind.IMAGE) {
+                                photo = item
+                            } else {
+                                phonePlayback = PhonePlayback(
+                                    urls = listOf(item.uri),
+                                    title = item.title,
+                                    subtitle = item.kind.label,
+                                    handOff = { at -> engine.castUris(listOf(Uri.parse(item.uri)), item.kind, startAtMs = at) },
+                                )
+                            }
+                        }.padding(horizontal = 22.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        MoodIcon(Glyph.Play, size = 18.dp, tint = Color.Black)
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (item.kind == MediaKind.IMAGE) "View" else "Play", color = Color.Black, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+                    GlassPill(onClick = {
+                        libraryItem = null
+                        if (connection is ConnectionState.Connected) {
+                            engine.castUris(listOf(Uri.parse(item.uri)), item.kind)
+                            onShowController(true)
+                        } else {
+                            tab = Tab.SCREENS
+                            scope.launch { snackbar.showSnackbar("Choose a screen, then send ${item.title} to it.") }
+                        }
+                    }) {
+                        MoodIcon(Glyph.Screen, size = 20.dp, tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text(connectedName?.let { "On $it" } ?: "Watch on TV", color = Color.White, fontSize = 16.sp)
+                    }
+                }
+                TextButton(onClick = { library.remove(item.id); libraryItem = null }) {
+                    Text("Remove from Library", color = MoodColors.Red)
+                }
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
@@ -464,6 +551,7 @@ internal fun TopBar(tab: Tab, connection: ConnectionState, wide: Boolean, modifi
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NavTab(Tab.HOME, tab == Tab.HOME, showLabel = wide || tab == Tab.HOME) { onTab(Tab.HOME) }
+            NavTab(Tab.LIBRARY, tab == Tab.LIBRARY, showLabel = wide || tab == Tab.LIBRARY) { onTab(Tab.LIBRARY) }
             NavTab(
                 Tab.SCREENS,
                 tab == Tab.SCREENS,
@@ -499,3 +587,11 @@ private fun NavTab(tab: Tab, selected: Boolean, showLabel: Boolean, live: Boolea
         }
     }
 }
+
+/** Something to play in the phone's Mood player, and how to continue it on a TV. */
+private data class PhonePlayback(
+    val urls: List<String>,
+    val title: String,
+    val subtitle: String?,
+    val handOff: (positionMs: Long) -> Unit,
+)

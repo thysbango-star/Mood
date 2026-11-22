@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rovian.mood.brand.launch.MoodLaunchAnimation
 import com.rovian.mood.cast.MediaKind
+import kotlinx.coroutines.launch
 import com.rovian.mood.catalog.InternetArchiveCatalog
 import com.rovian.mood.ui.shell.MoodShell
 import com.rovian.mood.ui.shell.PlatformActions
@@ -51,6 +52,17 @@ class MainActivity : ComponentActivity() {
     }
     private val musicPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         if (uris.isNotEmpty()) castPicked(uris, MediaKind.AUDIO)
+    }
+
+    private val libraryPicker = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        if (uris.isNotEmpty()) {
+            app.appScope.launch {
+                val added = app.library.add(uris)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, if (added > 0) "Added $added to Your Library" else "Those are already in Your Library", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
     }
 
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -86,6 +98,8 @@ class MainActivity : ComponentActivity() {
 
         override fun replayIntro() = replayLaunch()
 
+        override fun addToLibrary() = libraryPicker.launch(arrayOf("video/*", "audio/*", "image/*"))
+
         override fun enableMediaAccess() {
             if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
@@ -117,6 +131,7 @@ class MainActivity : ComponentActivity() {
                         networkCheck = app.networkCheck,
                         tvDisplay = app.tvDisplay,
                         mediaWatcher = app.mediaWatcher,
+                        library = app.library,
                         platform = platform,
                         showController = controllerVisible,
                         onShowController = { controllerVisible = it },

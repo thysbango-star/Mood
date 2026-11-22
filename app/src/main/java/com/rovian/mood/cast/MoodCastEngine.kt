@@ -177,7 +177,7 @@ class MoodCastEngine(
 
     // ---- Casting ----------------------------------------------------------------------
 
-    fun castUris(uris: List<Uri>, hint: MediaKind) {
+    fun castUris(uris: List<Uri>, hint: MediaKind, startAtMs: Long = 0) {
         if (uris.isEmpty()) return
         scope.launch {
             val endpoint = requireConnected() ?: return@launch
@@ -192,6 +192,7 @@ class MoodCastEngine(
                     }
                 }
                 send(endpoint, medias)
+                if (startAtMs > 0) active.value?.seekTo(startAtMs) // continue where the phone was
             }
         }
     }

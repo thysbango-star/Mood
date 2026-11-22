@@ -1,9 +1,14 @@
 package com.rovian.mood.ui.player
 
 import android.net.Uri
-import android.widget.VideoView
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -45,7 +50,9 @@ fun PhonePlayer(
 ) {
     BackHandler(onBack = onClose)
     val chrome = remember { PlayerChromeState() }
-    var view by remember { mutableStateOf<VideoView?>(null) }
+    var view by remember { mutableStateOf<MoodVideoView?>(null) }
+    var enhance by remember { mutableStateOf(true) }
+    var upscale by remember { mutableStateOf(1f) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
@@ -88,6 +95,19 @@ fun PhonePlayer(
         repeatOn = repeat,
         repeatOne = repeat,
         topEnd = {
+            if (view?.enhanceSupported == true && upscale > 1.15f) {
+                Text(
+                    if (enhance) "Enhance on · ${"%.1f".format(upscale)}×" else "Enhance off",
+                    color = if (enhance) Color.Black else Color.White,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .then(if (enhance) Modifier.clip(RoundedCornerShape(50)).background(Color.White) else Modifier.liquidGlass(RoundedCornerShape(50)))
+                        .clickable { enhance = !enhance; view?.enhance = enhance; chrome.poke() }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+            }
             GlyphButton(Glyph.Close, "Close player", onClose, Modifier.liquidGlass(RoundedCornerShape(50)), size = 40.dp)
         },
         aboveBar = {
@@ -103,26 +123,26 @@ fun PhonePlayer(
         AndroidView(
             modifier = Modifier.fillMaxSize().align(Alignment.Center),
             factory = { ctx ->
-                VideoView(ctx).apply {
+                MoodVideoView(ctx).apply {
                     var index = 0
-                    setOnPreparedListener { mp ->
-                        duration = mp.duration.toLong()
+                    onScaleChanged = { upscale = it }
+                    onPrepared = { d ->
+                        duration = d.toLong()
                         prepared = true
                         start()
                     }
-                    setOnCompletionListener {
+                    onCompletion = {
                         if (repeat) {
                             seekTo(0)
                             start()
                         }
                     }
-                    setOnErrorListener { _, _, _ ->
+                    onError = {
                         // Fall back to the next stream (e.g. MP4 if the adaptive one fails).
                         index++
                         prepared = false
                         if (index < urls.size) setVideoURI(Uri.parse(urls[index]))
-                        else error = "$title isn't available from its host right now."
-                        true
+                        else error = "$title couldn't be played."
                     }
                     setVideoURI(Uri.parse(urls.first()))
                     view = this
