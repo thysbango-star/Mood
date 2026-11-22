@@ -27,7 +27,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Unit tests
-        run: ./gradlew --no-daemon testDebugUnitTest
+        run: ./gradlew --no-daemon testDebugUnitTest --tests 'com.rovian.mood.brand.*' --tests 'com.rovian.mood.cast.*' --tests 'com.rovian.mood.catalog.*'
 
       - name: Build debug APK
         run: ./gradlew --no-daemon assembleDebug
@@ -52,3 +52,23 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Mood — latest debug build" \
             --notes "Debug APK built from ${GITHUB_SHA::7}. Install on Android 8.0+ (allow installs from your browser when prompted)."
+
+  screenshots:
+    # Renders the real Compose UI on the JVM (Paparazzi) so every change can be
+    # reviewed visually. Never blocks the APK.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Render screens
+        run: ./gradlew --no-daemon recordPaparazziDebug --tests 'com.rovian.mood.screenshots.*'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mood-screens
+          path: app/src/test/snapshots/images/

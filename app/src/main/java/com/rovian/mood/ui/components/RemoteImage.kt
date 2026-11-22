@@ -30,6 +30,9 @@ object ImageLoader {
 
     fun cached(url: String): Bitmap? = cache.get(url)
 
+    /** Seeds the cache (used by previews and screenshot tests). */
+    fun prime(url: String, bitmap: Bitmap) { cache.put(url, bitmap) }
+
     suspend fun load(url: String, maxSide: Int = 1920): Bitmap? = cache.get(url) ?: withContext(Dispatchers.IO) {
         runCatching {
             val bytes = (URL(url).openConnection() as HttpURLConnection).run {
