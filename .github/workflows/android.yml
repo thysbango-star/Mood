@@ -38,20 +38,22 @@ jobs:
           name: mood-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
 
-      # Rolling pre-release so the newest APK is always one tap away on a phone:
-      # https://github.com/<owner>/<repo>/releases/tag/latest-debug
-      - name: Publish rolling "latest-debug" release
-        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+      # Rolling pre-release so the newest APK is always one tap away on a phone.
+      # main → "latest-debug"; any other branch built on demand → "preview-<branch>".
+      - name: Publish APK release
+        if: github.event_name != 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          BRANCH="${GITHUB_REF_NAME}"
+          if [ "$BRANCH" = "main" ]; then TAG=latest-debug; TITLE="Mood — latest debug build"; else TAG="preview-${BRANCH//\//-}"; TITLE="Mood — preview build ($BRANCH)"; fi
           cp app/build/outputs/apk/debug/app-debug.apk mood-debug.apk
-          gh release delete latest-debug --yes --cleanup-tag || true
-          gh release create latest-debug mood-debug.apk \
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" mood-debug.apk \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Mood — latest debug build" \
-            --notes "Debug APK built from ${GITHUB_SHA::7}. Install on Android 8.0+ (allow installs from your browser when prompted)."
+            --title "$TITLE" \
+            --notes "Debug APK built from ${GITHUB_SHA::7} on $BRANCH. Install on Android 8.0+ (allow installs from your browser when prompted)."
 
   screenshots:
     # Renders the real Compose UI on the JVM (Paparazzi) so every change can be
