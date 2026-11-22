@@ -72,3 +72,14 @@ jobs:
         with:
           name: mood-screens
           path: app/src/test/snapshots/images/
+      - name: Publish screens to the ci-screens branch
+        if: always()
+        run: |
+          set -e
+          mkdir -p /tmp/screens && cp app/src/test/snapshots/images/*.png /tmp/screens/ 2>/dev/null || exit 0
+          cd /tmp/screens
+          git init -q -b ci-screens
+          git config user.name "mood-ci"
+          git config user.email "mood-ci@users.noreply.github.com"
+          git add -A && git commit -q -m "Screens for ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" ci-screens
