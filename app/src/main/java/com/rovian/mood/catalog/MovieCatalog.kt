@@ -24,18 +24,28 @@ data class Movie(
     val title: String,
     val year: Int,
     val genre: String,
-    val runtimeMinutes: Int,
+    val runtimeMinutes: Int?,
     val synopsis: String,
     val posterUrl: String,
     val backdropUrl: String,
     val streams: List<MovieStream>,
     /** Licence/credit line the provider requires to be shown. */
     val credit: String,
+    /** Average audience rating out of 5, and how many ratings it's based on. */
+    val rating: Double? = null,
+    val ratingCount: Int? = null,
+    /** True once [streams] and full details have been fetched. */
+    val detailed: Boolean = true,
 )
 
 data class CatalogRow(val title: String, val movies: List<Movie>)
 
-data class CatalogHome(val featured: Movie, val rows: List<CatalogRow>)
+data class CatalogHome(
+    val featured: Movie,
+    val rows: List<CatalogRow>,
+    /** Hero carousel; defaults to the featured title alone. */
+    val heroes: List<Movie> = listOf(featured),
+)
 
 /**
  * Where MoodPlay's movies come from. The UI and casting never depend on a
@@ -47,6 +57,8 @@ interface MovieCatalog {
     val providerName: String
     suspend fun home(): CatalogHome
     suspend fun search(query: String): List<Movie>
+    /** Fills in streams and full details (some providers only list them on demand). */
+    suspend fun details(movie: Movie): Movie = movie
 }
 
 /**
@@ -107,7 +119,7 @@ object MoodFit {
         title = movie.title,
         mimeType = stream.mimeType,
         source = MediaSource.Remote(stream.url),
-        durationMs = movie.runtimeMinutes * 60_000L,
+        durationMs = movie.runtimeMinutes?.let { it * 60_000L },
         subtitle = "${movie.year} · ${movie.genre}",
         artworkUrl = movie.backdropUrl,
     )

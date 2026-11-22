@@ -25,7 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.rovian.mood.brand.launch.MoodLaunchAnimation
 import com.rovian.mood.cast.MediaKind
-import com.rovian.mood.catalog.OpenFilmsCatalog
+import com.rovian.mood.catalog.InternetArchiveCatalog
 import com.rovian.mood.ui.shell.MoodShell
 import com.rovian.mood.ui.shell.PlatformActions
 import com.rovian.mood.ui.theme.MoodTheme
@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
     private var backgroundedAt = 0L
 
     private val app get() = application as MoodApp
-    private val catalog = OpenFilmsCatalog()
+    private val catalog = InternetArchiveCatalog()
 
     private val videoPicker = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(20)) { uris ->
         if (uris.isNotEmpty()) castPicked(uris, MediaKind.VIDEO)

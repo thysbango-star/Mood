@@ -99,7 +99,7 @@ fun ScreensScreen(state: ScreensState, actions: ScreensActions, contentStart: Dp
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item {
-            Row(Modifier.statusBarsPadding().padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.statusBarsPadding().padding(top = 76.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Screens", color = MoodColors.Ink, fontSize = 32.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 if (state.searching) SearchingCapsule()
             }

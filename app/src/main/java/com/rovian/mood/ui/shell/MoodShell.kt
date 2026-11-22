@@ -67,6 +67,20 @@ import com.rovian.mood.ui.catalog.CatalogScreen
 import com.rovian.mood.ui.catalog.GlassPill
 import com.rovian.mood.ui.catalog.SearchScreen
 import com.rovian.mood.ui.catalog.meta
+import com.rovian.mood.ui.catalog.ratingLabel
+import com.rovian.mood.ui.components.LocalHazeState
+import com.rovian.mood.ui.components.floatingGlass
+import com.rovian.mood.brand.MoodWordmark
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeSource
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.animation.Crossfade
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.rovian.mood.ui.components.Glyph
 import com.rovian.mood.ui.components.MoodIcon
 import com.rovian.mood.ui.components.RemoteImage
@@ -132,9 +146,35 @@ fun MoodShell(
     var linkDialog by remember { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
     val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val haze = remember { HazeState() }
+    var ambientUrl by remember { mutableStateOf<String?>(null) }
+    var searchingCatalog by remember { mutableStateOf(false) }
 
     val home by produceState<Result<CatalogHome>?>(null, catalog) { value = runCatching { catalog.home() } }
-    val results by produceState(emptyList<Movie>(), query) { value = runCatching { catalog.search(query) }.getOrDefault(emptyList()) }
+    val results by produceState(emptyList<Movie>(), query) {
+        if (query.isBlank()) {
+            value = emptyList()
+            return@produceState
+        }
+        searchingCatalog = true
+        delay(350) // wait for typing to settle
+        value = runCatching { catalog.search(query) }.getOrDefault(emptyList())
+        searchingCatalog = false
+    }
+
+    /** Fetches playable files/details on demand (the archive lists them per film). */
+    suspend fun withDetails(movie: Movie): Movie? {
+        val full = runCatching { catalog.details(movie) }.getOrElse {
+            snackbar.showSnackbar("Couldn't open ${movie.title}. Check your internet connection.")
+            return null
+        }
+        if (full.streams.isEmpty()) {
+            snackbar.showSnackbar("${movie.title} has no playable file on ${catalog.providerName}.")
+            return null
+        }
+        return full
+    }
 
     LaunchedEffect(Unit) { engine.messages.collect { snackbar.showSnackbar(it) } }
 
@@ -175,14 +215,30 @@ fun MoodShell(
 
     val connectedName = (connection as? ConnectionState.Connected)?.endpoint?.name
 
-    fun watch(movie: Movie) {
+    fun watch(movie: Movie, chooseScreen: Boolean = false) {
         infoMovie = null
-        if (connection is ConnectionState.Connected) {
-            engine.castMovie(movie)
-            onShowController(true)
-        } else {
-            pickFor = movie
-            engine.startDiscovery()
+        scope.launch {
+            val full = withDetails(movie) ?: return@launch
+            if (connection is ConnectionState.Connected && !chooseScreen) {
+                engine.castMovie(full)
+                onShowController(true)
+            } else {
+                pickFor = full
+                engine.startDiscovery()
+            }
+        }
+    }
+
+    fun playOnPhone(movie: Movie) {
+        infoMovie = null
+        scope.launch {
+            val full = withDetails(movie) ?: return@launch
+            if ((connection as? ConnectionState.Connected)?.endpoint?.protocol == CastProtocol.SCREEN) {
+                engine.castMovie(full) // mirrored TV: play natively on it
+                onShowController(true)
+            } else {
+                phoneMovie = full
+            }
         }
     }
 
@@ -204,45 +260,35 @@ fun MoodShell(
 
     BoxWithConstraints(Modifier.fillMaxSize().background(MoodColors.Night)) {
         val wide = maxWidth >= 640.dp
-        val contentStart = if (wide) 104.dp else 24.dp
-        when (tab) {
-            Tab.HOME -> CatalogScreen(
-                home = home?.getOrNull(),
-                error = home?.exceptionOrNull()?.let { "Couldn't load movies. Check your connection." },
-                watchLabel = "Watch",
-                contentStart = contentStart,
-                onWatch = ::watch,
-                onInfo = { infoMovie = it },
-            )
-            Tab.SEARCH -> SearchScreen(query, { query = it }, results, contentStart, onOpen = { infoMovie = it })
-            Tab.SCREENS -> ScreensScreen(
-                ScreensState(networkState, discovery, searching, devices, recents, connection, playback, preparing, availability, external),
-                screensActions,
-                contentStart,
-            )
-        }
-
-        // Top-right: live connection chip
-        if (tab != Tab.SCREENS) {
-            Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
-                ConnectionChip(connection) { tab = Tab.SCREENS }
+        val contentStart = if (wide) 64.dp else 22.dp
+        // Everything the glass navigation floats over is the blur source.
+        Box(Modifier.fillMaxSize().hazeSource(haze)) {
+            AmbientBackdrop(ambientUrl)
+            when (tab) {
+                Tab.HOME -> CatalogScreen(
+                    home = home?.getOrNull(),
+                    error = home?.exceptionOrNull()?.let { "Couldn't reach ${catalog.providerName}. Check your internet connection." },
+                    contentStart = contentStart,
+                    posterWidth = if (wide) 176.dp else 138.dp,
+                    onWatch = { watch(it) },
+                    onInfo = { infoMovie = it },
+                    onChooseScreen = { watch(it, chooseScreen = true) },
+                    onHeroChange = { ambientUrl = it.backdropUrl; tvDisplay.focus.value = it },
+                )
+                Tab.SEARCH -> SearchScreen(query, { query = it }, results, searchingCatalog, contentStart, onOpen = { infoMovie = it })
+                Tab.SCREENS -> ScreensScreen(
+                    ScreensState(networkState, discovery, searching, devices, recents, connection, playback, preparing, availability, external),
+                    screensActions,
+                    contentStart,
+                )
             }
         }
 
-        if (wide) {
-            Column(
-                Modifier.align(Alignment.CenterStart).padding(start = 16.dp).liquidGlass(RoundedCornerShape(50)).padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) { Tab.entries.forEach { NavItem(it, tab == it) { tab = it } } }
-        } else {
-            Row(
-                Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 12.dp)
-                    .liquidGlass(RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
-            ) { Tab.entries.forEach { NavItem(it, tab == it) { tab = it } } }
+        CompositionLocalProvider(LocalHazeState provides haze) {
+            TopBar(tab, connection, wide, Modifier.align(Alignment.TopCenter)) { tab = it }
         }
 
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 76.dp))
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 20.dp))
 
         if (showController && connection.endpoint != null) {
             val media = playback?.media
@@ -287,28 +333,33 @@ fun MoodShell(
         }
     }
 
-    infoMovie?.let { movie ->
-        ModalBottomSheet(onDismissRequest = { infoMovie = null }, containerColor = MoodColors.Charcoal) {
+    infoMovie?.let { listed ->
+        val movie by produceState(listed, listed.id) { value = runCatching { catalog.details(listed) }.getOrDefault(listed) }
+        ModalBottomSheet(onDismissRequest = { infoMovie = null }, containerColor = Color(0xFF17120F)) {
             Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp).navigationBarsPadding()) {
                 RemoteImage(movie.backdropUrl, movie.title, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(20.dp)))
                 Spacer(Modifier.height(16.dp))
                 Text(movie.title, color = MoodColors.Ink, fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                Text(movie.meta(), color = MoodColors.InkSecondary, fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    movie.ratingLabel()?.let {
+                        Text(it, color = MoodColors.Orange, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        movie.ratingCount?.let { n -> Text(" ($n ratings)", color = MoodColors.InkSecondary, fontSize = 13.sp) }
+                        Text("  ·  ", color = MoodColors.InkSecondary, fontSize = 14.sp)
+                    }
+                    Text(movie.meta(), color = MoodColors.InkSecondary, fontSize = 14.sp)
+                }
                 Spacer(Modifier.height(10.dp))
                 Text(movie.synopsis, color = MoodColors.Ink, fontSize = 15.sp, lineHeight = 21.sp)
                 Spacer(Modifier.height(8.dp))
                 Text(movie.credit, color = MoodColors.InkSecondary, fontSize = 12.sp)
                 Spacer(Modifier.height(18.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GlassPill(onClick = { watch(movie) }) {
+                    GlassPill(onClick = { watch(movie, chooseScreen = connectedName == null) }) {
                         MoodIcon(Glyph.Screen, size = 20.dp, tint = Color.White)
                         Spacer(Modifier.width(8.dp))
                         Text(connectedName?.let { "Watch on $it" } ?: "Watch on TV", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    GlassPill(onClick = {
-                        infoMovie = null
-                        if ((connection as? ConnectionState.Connected)?.endpoint?.protocol == CastProtocol.SCREEN) watch(movie) else phoneMovie = movie
-                    }) {
+                    GlassPill(onClick = { playOnPhone(movie) }) {
                         Text("Play on phone", color = Color.White, fontSize = 16.sp)
                     }
                 }
@@ -335,7 +386,7 @@ fun MoodShell(
                     tab = Tab.SCREENS
                 }
                 Row {
-                    TextButton(onClick = { pickFor = null; phoneMovie = movie }) { Text("Play on this phone", color = MoodColors.Orange) }
+                    TextButton(onClick = { pickFor = null; playOnPhone(movie) }) { Text("Play on this phone", color = MoodColors.Orange) }
                     TextButton(onClick = { pickFor = null; showTroubleshoot = true }) { Text("Don't see your TV?", color = MoodColors.InkSecondary) }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -374,40 +425,69 @@ fun MoodShell(
     }
 }
 
+/** The backdrop's colour, washed through the whole app (Liquid Glass picks it up). */
 @Composable
-private fun NavItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .background(if (selected) Color.White.copy(alpha = 0.22f) else Color.Transparent)
-            .clickable(role = Role.Tab, onClick = onClick)
-            .semantics { contentDescription = tab.label },
-        contentAlignment = Alignment.Center,
+private fun AmbientBackdrop(url: String?) {
+    Crossfade(url, label = "ambient") { u ->
+        Box(Modifier.fillMaxSize()) {
+            if (u != null) {
+                RemoteImage(u, null, Modifier.fillMaxSize().blur(90.dp).graphicsLayer { alpha = 0.6f })
+            }
+            Box(
+                Modifier.fillMaxSize().background(
+                    Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.35f), Color(0xF00D0A09))),
+                ),
+            )
+        }
+    }
+}
+
+/** Logo on the left; one floating glass capsule of navigation on the right. */
+@Composable
+private fun TopBar(tab: Tab, connection: ConnectionState, wide: Boolean, modifier: Modifier, onTab: (Tab) -> Unit) {
+    Row(
+        modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = if (wide) 40.dp else 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        MoodIcon(tab.glyph, size = 22.dp, tint = if (selected) Color.White else Color.White.copy(alpha = 0.7f))
+        MoodWordmark(Modifier.width(if (wide) 118.dp else 92.dp), letterColor = Color.White)
+        Spacer(Modifier.weight(1f))
+        Row(
+            Modifier.floatingGlass(RoundedCornerShape(50)).padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            NavTab(Tab.HOME, tab == Tab.HOME, showLabel = wide || tab == Tab.HOME) { onTab(Tab.HOME) }
+            NavTab(
+                Tab.SCREENS,
+                tab == Tab.SCREENS,
+                showLabel = wide || tab == Tab.SCREENS,
+                live = connection is ConnectionState.Connected,
+            ) { onTab(Tab.SCREENS) }
+            Box(Modifier.padding(horizontal = 6.dp).width(1.dp).height(22.dp).background(Color.White.copy(alpha = 0.2f)))
+            NavTab(Tab.SEARCH, tab == Tab.SEARCH, showLabel = false) { onTab(Tab.SEARCH) }
+        }
     }
 }
 
 @Composable
-private fun ConnectionChip(connection: ConnectionState, onClick: () -> Unit) {
-    val ep = connection.endpoint
-    val (label, color) = when (connection) {
-        is ConnectionState.Connected -> ep!!.name to MoodColors.Orange
-        is ConnectionState.Connecting -> "Connecting…" to MoodColors.InkSecondary
-        is ConnectionState.Reconnecting -> "Reconnecting…" to MoodColors.InkSecondary
-        else -> null to Color.White
-    }
+private fun NavTab(tab: Tab, selected: Boolean, showLabel: Boolean, live: Boolean = false, onClick: () -> Unit) {
+    val fg = if (selected) Color.Black else Color.White.copy(alpha = 0.85f)
     Row(
-        Modifier.liquidGlass(RoundedCornerShape(50)).clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp)
-            .semantics { contentDescription = label?.let { "Screen: $it" } ?: "Choose a screen" },
+        Modifier
+            .height(42.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) Color.White else Color.Transparent)
+            .clickable(role = Role.Tab, onClick = onClick)
+            .padding(horizontal = if (showLabel) 16.dp else 11.dp)
+            .semantics { contentDescription = tab.label },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        MoodIcon(Glyph.Screen, size = 20.dp, tint = color)
-        if (label != null) {
+        Box {
+            MoodIcon(tab.glyph, size = 20.dp, tint = fg)
+            if (live) Box(Modifier.align(Alignment.TopEnd).size(7.dp).clip(CircleShape).background(MoodColors.Orange))
+        }
+        if (showLabel) {
             Spacer(Modifier.width(8.dp))
-            Text(label, color = Color.White, fontSize = 13.sp, maxLines = 1)
+            Text(tab.label, color = fg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }

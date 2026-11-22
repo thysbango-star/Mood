@@ -77,7 +77,7 @@ class OpenFilmsCatalog : MovieCatalog {
         featured = movies.first(),
         rows = listOf(
             CatalogRow("Movies For You", movies),
-            CatalogRow("Short & Animated", movies.filter { it.runtimeMinutes <= 11 }),
+            CatalogRow("Short & Animated", movies.filter { (it.runtimeMinutes ?: 0) <= 11 }),
         ),
     )
 

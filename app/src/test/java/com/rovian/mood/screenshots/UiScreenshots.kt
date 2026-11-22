@@ -193,7 +193,7 @@ class UiScreenshots {
     fun home_phone() {
         primeArtwork()
         paparazzi.snapshot {
-        Frame(wide = false) { CatalogScreen(home, null, "Watch", 24.dp, {}, {}) }
+        Frame(wide = false) { CatalogScreen(home.copy(heroes = home.rows.first().movies), null, 22.dp, 138.dp, {}, {}, {}, {}) }
         }
     }
 
@@ -201,7 +201,7 @@ class UiScreenshots {
     fun home_tablet() {
         paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.LANDSCAPE))
         primeArtwork()
-        paparazzi.snapshot { Frame(wide = true) { CatalogScreen(home, null, "Watch", 104.dp, {}, {}) } }
+        paparazzi.snapshot { Frame(wide = true) { CatalogScreen(home.copy(heroes = home.rows.first().movies), null, 64.dp, 176.dp, {}, {}, {}, {}) } }
     }
 
     @Test
