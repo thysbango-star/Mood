@@ -78,7 +78,7 @@ fun TroubleshootSheet(
             Step(
                 "If your TV supports neither",
                 "Plug in a Chromecast or Google TV Streamer, or an Android TV box, and Mood will cast to it. " +
-                    "A browser-based Mood receiver for TVs with only a web browser is planned.",
+                    "Or mirror the phone with Android's Cast screen — Mood switches the TV to its big-screen view.",
             )
             Text("Network check", color = MoodColors.Ink, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             Text(

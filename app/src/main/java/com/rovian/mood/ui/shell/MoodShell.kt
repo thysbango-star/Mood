@@ -53,8 +53,11 @@ import com.rovian.mood.cast.MediaSource
 import com.rovian.mood.cast.MoodCastEngine
 import com.rovian.mood.cast.ReceiverEndpoint
 import com.rovian.mood.cast.endpoint
+import com.rovian.mood.cast.hasSession
 import com.rovian.mood.cast.media.MediaResolver
+import com.rovian.mood.cast.mirror.DisplayAdapter
 import com.rovian.mood.cast.mirror.SystemMirroring
+import com.rovian.mood.cast.CastProtocol
 import com.rovian.mood.catalog.CatalogHome
 import com.rovian.mood.catalog.Movie
 import com.rovian.mood.catalog.MovieCatalog
@@ -103,6 +106,7 @@ fun MoodShell(
     resolver: MediaResolver,
     mirroring: SystemMirroring,
     networkCheck: NetworkCheck,
+    tvDisplay: DisplayAdapter,
     platform: PlatformActions,
     showController: Boolean,
     onShowController: (Boolean) -> Unit,
@@ -133,6 +137,22 @@ fun MoodShell(
     val results by produceState(emptyList<Movie>(), query) { value = runCatching { catalog.search(query) }.getOrDefault(emptyList()) }
 
     LaunchedEffect(Unit) { engine.messages.collect { snackbar.showSnackbar(it) } }
+
+    // Keep the TV view in step with the phone.
+    LaunchedEffect(home) { tvDisplay.home.value = home?.getOrNull() }
+    LaunchedEffect(infoMovie) { infoMovie?.let { tvDisplay.focus.value = it } }
+
+    // Screen mirroring detected → give the TV MoodPlay's own big-screen view,
+    // unless the user is already casting somewhere else.
+    val mirroredScreen = devices.flatMap { it.endpoints }.firstOrNull { it.protocol == CastProtocol.SCREEN }
+    LaunchedEffect(mirroredScreen?.id) {
+        val ep = mirroredScreen ?: return@LaunchedEffect
+        val current = engine.connection.value
+        if (!current.hasSession && current !is ConnectionState.Connecting) {
+            engine.connect(ep)
+            snackbar.showSnackbar("Mirroring to ${ep.name} — the TV now shows MoodPlay's big-screen view.")
+        }
+    }
 
     // While the user is choosing a screen, scan actively (as Google recommends for
     // device pickers); the rest of the time, cheaper passive discovery runs.

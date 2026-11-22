@@ -6,6 +6,8 @@ import java.util.UUID
 enum class CastProtocol(val label: String, val rank: Int) {
     GOOGLE_CAST("Google Cast", 0),
     DLNA("DLNA", 1),
+    /** The TV is showing this phone via system screen mirroring; Mood draws a TV-native view on it. */
+    SCREEN("TV display", 2),
 }
 
 enum class MediaKind(val label: String) { VIDEO("Video"), AUDIO("Music"), IMAGE("Photo") }

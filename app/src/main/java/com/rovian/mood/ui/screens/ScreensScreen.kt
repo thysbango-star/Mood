@@ -283,14 +283,14 @@ private fun DeviceRow(device: MoodDevice, connection: ConnectionState, onConnect
 private fun MirrorCard(externalDisplay: String?, actions: ScreensActions) {
     GlassCard(title = "Mirror your whole screen") {
         Text(
-            "Android runs screen mirroring itself, so Mood opens the system's Cast screen. " +
-                "Mood media casting (above) plays on the TV directly — better quality and no lag.",
+            "Start mirroring from Android's Cast screen. Mood notices the TV and switches it to " +
+                "MoodPlay's big-screen view at the TV's own resolution, with this phone as the remote.",
             color = MoodColors.InkSecondary,
             fontSize = 14.sp,
             lineHeight = 19.sp,
         )
         if (externalDisplay != null) {
-            Text("Android reports a connected display: $externalDisplay", color = MoodColors.Orange, fontSize = 14.sp)
+            Text("Mirroring to $externalDisplay — the TV is showing MoodPlay's TV view.", color = MoodColors.Orange, fontSize = 14.sp)
         }
         ActionPill(Glyph.Mirror, "Open screen mirroring", actions::mirror)
     }

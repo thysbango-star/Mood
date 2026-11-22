@@ -7,6 +7,7 @@ import com.rovian.mood.cast.dlna.DlnaAdapter
 import com.rovian.mood.cast.googlecast.GoogleCastAdapter
 import com.rovian.mood.cast.media.LocalMediaServer
 import com.rovian.mood.cast.media.MediaResolver
+import com.rovian.mood.cast.mirror.DisplayAdapter
 import com.rovian.mood.cast.mirror.SystemMirroring
 import com.rovian.mood.diagnostics.NetworkCheck
 import com.rovian.mood.net.NetworkMonitor
@@ -33,19 +34,22 @@ class MoodApp : Application() {
         private set
     lateinit var networkCheck: NetworkCheck
         private set
+    lateinit var tvDisplay: DisplayAdapter
+        private set
 
     override fun onCreate() {
         super.onCreate()
         networkMonitor = NetworkMonitor(this)
         mediaResolver = MediaResolver(this)
         mirroring = SystemMirroring(this)
-        networkCheck = NetworkCheck(this, networkMonitor)
+        networkCheck = NetworkCheck(this, networkMonitor, mirroring)
+        tvDisplay = DisplayAdapter(this, mirroring)
         val googleCast = GoogleCastAdapter(this)
         val dlna = DlnaAdapter(this, networkMonitor)
         castEngine = MoodCastEngine(
             context = this,
             network = networkMonitor,
-            adapters = listOf(googleCast, dlna),
+            adapters = listOf(googleCast, dlna, tvDisplay),
             server = LocalMediaServer { msg, e -> android.util.Log.i("MoodMediaServer", msg, e) },
             resolver = mediaResolver,
             recents = RecentDevices(this),

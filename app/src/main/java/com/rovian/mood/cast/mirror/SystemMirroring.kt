@@ -13,16 +13,15 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Whole-screen mirroring, honestly scoped.
+ * Whole-screen mirroring.
  *
  * Android does not let ordinary apps drive Google Cast screen mirroring or
  * Miracast: the Cast SDK only casts media, and wireless display is controlled
  * by the system (Quick Settings "Screen Cast" / Samsung "Smart View"). So Mood
  * hands off to the system picker and reports only what Android tells it —
- * an external presentation display appearing or disappearing.
- *
- * A Mood-native mirror (MediaProjection → stream to the Mood Web Receiver) is a
- * separate pathway that needs the web receiver; it plugs into CastAdapter.
+ * an external presentation display appearing or disappearing. When it does,
+ * [com.rovian.mood.cast.mirror.DisplayAdapter] takes over that display with a
+ * TV-native interface instead of a copy of the phone.
  */
 class SystemMirroring(context: Context) {
     private val app = context.applicationContext
@@ -31,6 +30,14 @@ class SystemMirroring(context: Context) {
     private val _externalDisplay = MutableStateFlow<String?>(null)
     /** Name of an external/wireless display Android currently reports, if any. */
     val externalDisplay: StateFlow<String?> = _externalDisplay.asStateFlow()
+
+    private val _presentation = MutableStateFlow<Display?>(null)
+    /**
+     * The display a mirrored TV appears as. When the system mirrors the phone to a
+     * TV (Miracast/Smart View/Screen Cast), Android exposes it as a presentation
+     * display that apps may draw their own content on, at the TV's own resolution.
+     */
+    val presentationDisplay: StateFlow<Display?> = _presentation.asStateFlow()
 
     private val listener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) = refresh()
@@ -44,9 +51,18 @@ class SystemMirroring(context: Context) {
     }
 
     private fun refresh() {
-        _externalDisplay.value = displays.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
-            .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY }
-            ?.name
+        val display = displays.getDisplays(DisplayManager.DISPLAY_CATEGORY_PRESENTATION)
+            .firstOrNull { it.displayId != Display.DEFAULT_DISPLAY && it.isValid }
+        _presentation.value = display
+        _externalDisplay.value = display?.name
+    }
+
+    /** Every display Android reports, for the network check. */
+    fun describeDisplays(): List<String> = displays.displays.map { d ->
+        val mode = d.mode
+        val presentation = (d.flags and Display.FLAG_PRESENTATION) != 0
+        "#${d.displayId} ${d.name}: ${mode.physicalWidth}×${mode.physicalHeight} @${mode.refreshRate.toInt()}Hz" +
+            if (presentation) " (presentation)" else ""
     }
 
     val canOpenSystemPicker: Boolean

@@ -32,7 +32,11 @@ data class SsdpResponder(val ip: String, val server: String?, val targets: Set<S
  * A one-tap check of what this phone can actually see on the network, using
  * Android's own mDNS (independent of the Cast SDK) and a raw SSDP census.
  */
-class NetworkCheck(context: Context, private val network: NetworkMonitor) {
+class NetworkCheck(
+    context: Context,
+    private val network: NetworkMonitor,
+    private val mirroring: com.rovian.mood.cast.mirror.SystemMirroring,
+) {
     private val app = context.applicationContext
 
     suspend fun run(): List<String> = coroutineScope {
@@ -68,6 +72,9 @@ class NetworkCheck(context: Context, private val network: NetworkMonitor) {
             lines += "  • ${r.ip} ${r.server?.take(60) ?: ""} [${roles.joinToString()}]"
         }
 
+        lines += ""
+        lines += "Displays Android reports:"
+        lines += mirroring.describeDisplays().map { "  • $it" }
         lines += ""
         lines += "What this means:"
         lines += verdicts(network.state.value, cast, responders)

@@ -268,10 +268,10 @@ class MoodCastEngine(
                 is Compatibility.Unsupported -> rejected += compat.reason
                 is Compatibility.Unverified -> {
                     if (medias.size == 1) _messages.emit(compat.note)
-                    resolved += resolve(media, null)
+                    resolved += resolve(endpoint, media, null)
                 }
-                is Compatibility.Convert -> resolved += resolve(media, compat.toMime)
-                Compatibility.Supported -> resolved += resolve(media, null)
+                is Compatibility.Convert -> resolved += resolve(endpoint, media, compat.toMime)
+                Compatibility.Supported -> resolved += resolve(endpoint, media, null)
             }
         }
         if (resolved.isEmpty()) {
@@ -292,8 +292,13 @@ class MoodCastEngine(
         return " ${device.name} also supports ${other.protocol.label}, which may play it — switch in the screen list."
     }
 
-    private suspend fun resolve(media: CastMedia, convertTo: String?): ResolvedMedia {
-        return when (val source = media.source) {
+    private suspend fun resolve(endpoint: ReceiverEndpoint, media: CastMedia, convertTo: String?): ResolvedMedia {
+        val source = media.source
+        // The phone itself renders onto a mirrored display: no network hop needed.
+        if (source is MediaSource.Local && endpoint.protocol == CastProtocol.SCREEN) {
+            return ResolvedMedia(media, source.contentUri, media.mimeType, null)
+        }
+        return when (source) {
             is MediaSource.Remote -> ResolvedMedia(media, source.url, media.mimeType, media.artworkUrl)
             is MediaSource.Local -> {
                 val info = network.local.value

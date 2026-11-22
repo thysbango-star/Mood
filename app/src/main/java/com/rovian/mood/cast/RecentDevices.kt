@@ -24,7 +24,7 @@ class RecentDevices(context: Context) {
     val items: StateFlow<List<RecentDevice>> = _items.asStateFlow()
 
     fun remember(endpoint: ReceiverEndpoint) {
-        if (endpoint.id.startsWith("session:")) return
+        if (endpoint.id.startsWith("session:") || endpoint.protocol == CastProtocol.SCREEN) return
         val updated = listOf(
             RecentDevice(endpoint.protocol, endpoint.id, endpoint.name, endpoint.model, System.currentTimeMillis()),
         ) + _items.value.filterNot { it.endpointKey == endpoint.key }

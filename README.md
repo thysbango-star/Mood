@@ -23,7 +23,9 @@ cast/
   dlna/                   DLNA/UPnP AV — SSDP discovery, device description, SOAP control, polling
   media/LocalMediaServer  token-protected HTTP server with Range support so TVs can stream phone files
   media/MediaResolver     reads picked files, converts photos (HEIC→JPEG), validates links
-  mirror/SystemMirroring  hands off to Android's own Cast screen; reports external displays
+  mirror/SystemMirroring  hands off to Android's own Cast screen; reports the mirrored display
+  mirror/DisplayAdapter   TV display mode: while mirroring, Mood draws a TV-native UI on the TV
+                          (Android Presentation API, TV's own resolution) and plays media there
   service/                foreground service, alive only while a session exists
 catalog/
   MovieCatalog.kt         provider interface + MoodFit stream selection
@@ -41,8 +43,6 @@ catalog/
 - Otherwise MoodFit sends the best fixed version the TV says it can play.
 
 **Not built yet:**
-- **Mood Web Receiver** for browser-only TVs. It needs a hosted pairing/signalling service, and it plugs in as another `CastAdapter`.
-- **Mood-native mirroring** (MediaProjection → web receiver). This also depends on the web receiver.
 - **Branded Cast receiver.** It needs a Receiver App ID from the Google Cast Developer Console. Until then Mood uses Google's Default Media Receiver (`CastOptionsProvider.RECEIVER_APP_ID`).
 
 ## Test matrix
@@ -60,7 +60,8 @@ catalog/
 | Sender goes offline | ⏳ | Cast resumes the session via the SDK; DLNA TV keeps playing remote URLs |
 | Unsupported format | ✅ logic in CI | Blocked before sending, with the reason |
 | Network permission denied | n/a on targetSdk 35 | Discovery uses only install-time permissions |
-| Browser receiver, Nude OS sender | ❌ not built | |
+| TV display mode while mirroring | ⏳ needs hardware | Works when the phone's mirroring exposes a presentation display (Miracast/Smart View do); the network check lists displays |
+| Nude OS sender | ❌ not built | |
 
 ## Launch animation
 

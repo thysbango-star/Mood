@@ -86,6 +86,7 @@ object CompatibilityChecker {
         return when (endpoint.protocol) {
             CastProtocol.GOOGLE_CAST -> checkCast(endpoint, kind, m)
             CastProtocol.DLNA -> checkDlna(endpoint, kind, m)
+            CastProtocol.SCREEN -> checkDisplay(kind, m)
         }
     }
 
@@ -113,6 +114,17 @@ object CompatibilityChecker {
             kind == MediaKind.IMAGE && declaredSupports(declared, "image/jpeg") -> Compatibility.Convert("image/jpeg")
             else -> Compatibility.Unsupported("${endpoint.name} doesn't list ${MediaFormats.describe(m)} among the formats it plays.")
         }
+    }
+
+    /** The phone's own media player renders onto the mirrored TV display. */
+    private fun checkDisplay(kind: MediaKind, m: String): Compatibility = when (kind) {
+        MediaKind.IMAGE -> Compatibility.Supported // decoded on the phone
+        MediaKind.VIDEO -> when (m) {
+            "application/dash+xml" -> Compatibility.Unsupported("The phone's player can't play DASH streams.")
+            in MediaFormats.castVideo, "video/x-matroska", "video/3gpp", "video/quicktime" -> Compatibility.Supported
+            else -> Compatibility.Unverified("This phone may not be able to play ${MediaFormats.describe(m)}.")
+        }
+        MediaKind.AUDIO -> Compatibility.Supported
     }
 
     fun declaredSupports(declared: Set<String>, mime: String): Boolean {

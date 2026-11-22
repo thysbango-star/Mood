@@ -108,6 +108,7 @@ class MainActivity : ComponentActivity() {
                         resolver = app.mediaResolver,
                         mirroring = app.mirroring,
                         networkCheck = app.networkCheck,
+                        tvDisplay = app.tvDisplay,
                         platform = platform,
                         showController = controllerVisible,
                         onShowController = { controllerVisible = it },
@@ -129,6 +130,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         // Discover only while Mood is on screen; sessions continue in the background.
         app.castEngine.startDiscovery()
+        app.tvDisplay.attach(this)
         val since = backgroundedAt
         backgroundedAt = 0L
         if (since > 0L && SystemClock.elapsedRealtime() - since >= REPLAY_AFTER_BACKGROUND_MS) {
@@ -139,6 +141,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         app.castEngine.stopDiscovery()
+        app.tvDisplay.detach(this)
         if (!isChangingConfigurations) backgroundedAt = SystemClock.elapsedRealtime()
     }
 

@@ -47,6 +47,9 @@ import com.rovian.mood.ui.screens.ScreensScreen
 import com.rovian.mood.ui.screens.ScreensState
 import com.rovian.mood.ui.theme.MoodColors
 import com.rovian.mood.ui.theme.MoodTheme
+import com.rovian.mood.ui.tv.TvHome
+import app.cash.paparazzi.DeviceConfig as Dc
+import com.android.resources.Density
 import kotlinx.coroutines.runBlocking
 import org.junit.Rule
 import org.junit.Test
@@ -260,6 +263,18 @@ class UiScreenshots {
                 null, null, null, noController,
             )
         }
+        }
+    }
+
+    @Test
+    fun tv_display_home() {
+        paparazzi.unsafeUpdateConfig(
+            Dc(screenWidth = 1920, screenHeight = 1080, xdpi = 160, ydpi = 160, density = Density.MEDIUM,
+                orientation = ScreenOrientation.LANDSCAPE),
+        )
+        primeArtwork()
+        paparazzi.snapshot {
+            MoodTheme { TvHome(home.rows.first().movies[1], home.rows.first().movies, "1920×1080") }
         }
     }
 }
