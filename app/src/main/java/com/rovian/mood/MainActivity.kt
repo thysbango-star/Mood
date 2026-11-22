@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
                         catalog = catalog,
                         resolver = app.mediaResolver,
                         mirroring = app.mirroring,
+                        networkCheck = app.networkCheck,
                         platform = platform,
                         showController = controllerVisible,
                         onShowController = { controllerVisible = it },

@@ -59,6 +59,7 @@ import com.rovian.mood.catalog.CatalogHome
 import com.rovian.mood.catalog.Movie
 import com.rovian.mood.catalog.MovieCatalog
 import com.rovian.mood.net.NetworkMonitor
+import com.rovian.mood.diagnostics.NetworkCheck
 import com.rovian.mood.ui.catalog.CatalogScreen
 import com.rovian.mood.ui.catalog.GlassPill
 import com.rovian.mood.ui.catalog.SearchScreen
@@ -101,6 +102,7 @@ fun MoodShell(
     catalog: MovieCatalog,
     resolver: MediaResolver,
     mirroring: SystemMirroring,
+    networkCheck: NetworkCheck,
     platform: PlatformActions,
     showController: Boolean,
     onShowController: (Boolean) -> Unit,
@@ -131,6 +133,11 @@ fun MoodShell(
     val results by produceState(emptyList<Movie>(), query) { value = runCatching { catalog.search(query) }.getOrDefault(emptyList()) }
 
     LaunchedEffect(Unit) { engine.messages.collect { snackbar.showSnackbar(it) } }
+
+    // While the user is choosing a screen, scan actively (as Google recommends for
+    // device pickers); the rest of the time, cheaper passive discovery runs.
+    val choosing = tab == Tab.SCREENS || pickFor != null
+    LaunchedEffect(choosing) { engine.startDiscovery(activeScan = choosing) }
 
     // Watch → pick a screen → cast as soon as the connection is real.
     LaunchedEffect(connection, pendingMovie) {
@@ -242,7 +249,7 @@ fun MoodShell(
                 },
             )
         }
-        phoneMovie?.let { m -> PhonePlayer(m.streams.first { !it.adaptive || m.streams.size == 1 }.url, m.title) { phoneMovie = null } }
+        phoneMovie?.let { m -> PhonePlayer(m.streams.sortedBy { it.adaptive }.map { it.url }, m.title) { phoneMovie = null } }
     }
 
     infoMovie?.let { movie ->
@@ -305,6 +312,7 @@ fun MoodShell(
             onSearchAgain = { engine.searchAgain(); showTroubleshoot = false },
             onWifiSettings = platform::openWifiSettings,
             onDismiss = { showTroubleshoot = false },
+            runNetworkCheck = networkCheck::run,
         )
     }
 

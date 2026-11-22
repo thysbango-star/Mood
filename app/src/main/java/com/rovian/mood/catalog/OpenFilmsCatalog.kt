@@ -2,15 +2,17 @@ package com.rovian.mood.catalog
 
 /**
  * Built-in catalogue of openly licensed films (Blender Foundation open movies,
- * Creative Commons Attribution), served from Google's public Cast sample bucket —
- * the same files Google uses in its own Cast samples. Every title is genuinely
+ * Creative Commons Attribution), served from the Android developer samples mirror —
+ * the same files Google uses in its own Android/Cast samples. Every title is genuinely
  * castable, so the whole find → watch → broadcast flow works today without a
  * content deal. Replace with a licensed partner's [MovieCatalog] for production.
  */
 class OpenFilmsCatalog : MovieCatalog {
     override val providerName = "Open films"
 
-    private val bucket = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample"
+    // Google retired the original commondatastorage "gtv-videos-bucket"; Android's own
+    // samples now use this mirror of the same files.
+    private val bucket = "https://storage.googleapis.com/androiddevelopers/samples_assets/gtv-videos-bucket/sample"
     private val blender = "© Blender Foundation · CC BY · blender.org"
 
     private val movies = listOf(

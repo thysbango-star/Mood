@@ -63,7 +63,22 @@ interface MovieCatalog {
 object MoodFit {
     data class Choice(val stream: MovieStream, val explanation: String)
 
-    fun choose(movie: Movie, endpoint: ReceiverEndpoint): Choice? {
+    fun choose(movie: Movie, endpoint: ReceiverEndpoint): Choice? = ranked(movie, endpoint).firstOrNull()
+
+    /** Every stream the receiver may play, best first — so a dead stream can fall back to the next. */
+    fun ranked(movie: Movie, endpoint: ReceiverEndpoint): List<Choice> {
+        val out = mutableListOf<Choice>()
+        var remaining = movie
+        while (true) {
+            val next = chooseOne(remaining, endpoint) ?: break
+            out += next
+            remaining = remaining.copy(streams = remaining.streams - next.stream)
+            if (remaining.streams.isEmpty()) break
+        }
+        return out
+    }
+
+    private fun chooseOne(movie: Movie, endpoint: ReceiverEndpoint): Choice? {
         val playable = movie.streams.filter {
             CompatibilityChecker.check(endpoint, MediaKind.VIDEO, it.mimeType) !is Compatibility.Unsupported
         }

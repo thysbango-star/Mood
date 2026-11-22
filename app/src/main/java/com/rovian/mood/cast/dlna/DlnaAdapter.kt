@@ -18,6 +18,7 @@ import com.rovian.mood.cast.ReceiverEndpoint
 import com.rovian.mood.cast.ReceiverKind
 import com.rovian.mood.cast.RepeatMode
 import com.rovian.mood.cast.ResolvedMedia
+import com.rovian.mood.diagnostics.Diagnostics
 import com.rovian.mood.net.LocalNetworkInfo
 import com.rovian.mood.net.NetworkMonitor
 import kotlinx.coroutines.CoroutineScope
@@ -81,6 +82,13 @@ class DlnaAdapter(context: Context, private val network: NetworkMonitor) : CastA
     private val inFlight = ConcurrentHashMap.newKeySet<String>()
     private var discoveryJob: Job? = null
     private var multicastLock: WifiManager.MulticastLock? = null
+    @Volatile private var searchesSent = 0
+    @Volatile private var repliesSeen = 0
+
+    private fun recordSearch() {
+        Diagnostics.set("dlna.search", "$searchesSent searches sent, $repliesSeen replies, ${found.size} DLNA renderers")
+        Diagnostics.set("dlna.renderers", found.size.toString())
+    }
 
     // Session state (guarded by being touched only from the session coroutine + lock).
     private val soapLock = Mutex()
@@ -138,6 +146,7 @@ class DlnaAdapter(context: Context, private val network: NetworkMonitor) : CastA
             }.also { s -> runCatching { info.network.bindSocket(s) } }
         } catch (e: IOException) {
             Log.w(TAG, "SSDP socket failed", e)
+            Diagnostics.event("DLNA socket failed: ${e.message}")
             _availability.value = AdapterAvailability.Unavailable("This network blocked device discovery.")
             return
         }
@@ -148,7 +157,11 @@ class DlnaAdapter(context: Context, private val network: NetworkMonitor) : CastA
                 for (target in listOf(Ssdp.MEDIA_RENDERER, Ssdp.AV_TRANSPORT)) {
                     val msg = Ssdp.searchMessage(target).toByteArray(Charsets.US_ASCII)
                     runCatching { socket.send(DatagramPacket(msg, msg.size, group, Ssdp.PORT)) }
-                        .onFailure { Log.d(TAG, "M-SEARCH send failed: ${it.message}") }
+                        .onSuccess { searchesSent++ }
+                        .onFailure {
+                            Log.d(TAG, "M-SEARCH send failed: ${it.message}")
+                            Diagnostics.event("DLNA search send failed: ${it.message}")
+                        }
                 }
                 val listenUntil = System.currentTimeMillis() + LISTEN_WINDOW_MS
                 while (System.currentTimeMillis() < listenUntil && currentCoroutineActive()) {
@@ -159,9 +172,11 @@ class DlnaAdapter(context: Context, private val network: NetworkMonitor) : CastA
                         continue
                     }
                     val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
+                    repliesSeen++
                     Ssdp.parse(text)?.let { onAnnouncement(it, info) }
                 }
                 prune()
+                recordSearch()
                 delay(SEARCH_INTERVAL_MS)
             }
         } finally {
@@ -189,6 +204,7 @@ class DlnaAdapter(context: Context, private val network: NetworkMonitor) : CastA
                 Log.i(TAG, "Found renderer ${renderer.friendlyName} (${renderer.manufacturer} ${renderer.modelName})")
             } catch (e: Exception) {
                 Log.d(TAG, "Ignoring ${response.location}: ${e.message}")
+                Diagnostics.event("DLNA: couldn't read ${response.location}: ${e.javaClass.simpleName}")
             } finally {
                 inFlight.remove(udn)
             }

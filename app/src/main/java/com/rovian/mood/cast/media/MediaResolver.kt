@@ -200,6 +200,15 @@ class MediaResolver(context: Context) {
         CastMedia(kind, title, mime, MediaSource.Remote(url.toString()))
     }
 
+    /** True if [url] answers with media from this phone right now (2xx/206). */
+    suspend fun isReachable(url: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val u = URL(url)
+            val (code, _) = probe(u, "HEAD").let { if (it.first == 405 || it.first == 501) probe(u, "GET") else it }
+            code in 200..299
+        }.getOrDefault(false)
+    }
+
     private fun probe(url: URL, method: String): Pair<Int, String?> {
         val conn = url.openConnection() as HttpURLConnection
         return try {

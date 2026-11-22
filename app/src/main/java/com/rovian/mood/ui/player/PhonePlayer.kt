@@ -26,7 +26,7 @@ import com.rovian.mood.ui.theme.MoodColors
 
 /** Watch on the phone itself, using the platform player. */
 @Composable
-fun PhonePlayer(url: String, title: String, onClose: () -> Unit) {
+fun PhonePlayer(urls: List<String>, title: String, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     var error by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -38,11 +38,18 @@ fun PhonePlayer(url: String, title: String, onClose: () -> Unit) {
                     controller.setAnchorView(this)
                     setMediaController(controller)
                     setOnPreparedListener { start() }
+                    var index = 0
                     setOnErrorListener { _, _, _ ->
-                        error = "This phone couldn't play $title."
+                        // Fall back to the next stream (e.g. MP4 if the adaptive one fails).
+                        index++
+                        if (index < urls.size) {
+                            setVideoURI(Uri.parse(urls[index]))
+                        } else {
+                            error = "$title isn't available from its host right now."
+                        }
                         true
                     }
-                    setVideoURI(Uri.parse(url))
+                    setVideoURI(Uri.parse(urls.first()))
                 }
             },
             onRelease = { it.stopPlayback() },

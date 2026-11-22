@@ -40,6 +40,7 @@ import com.rovian.mood.cast.ReceiverEndpoint
 import com.rovian.mood.cast.ReceiverKind
 import com.rovian.mood.cast.RepeatMode
 import com.rovian.mood.cast.ResolvedMedia
+import com.rovian.mood.diagnostics.Diagnostics
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -95,7 +96,9 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
     /** Starts the Cast framework. Non-blocking; call on the main thread. */
     fun initialize() {
         val gms = GoogleApiAvailability.getInstance().isGooglePlayServicesAvailable(context)
+        Diagnostics.set("cast.state", "starting (Play services status $gms)")
         if (gms != ConnectionResult.SUCCESS) {
+            Diagnostics.set("cast.state", "unavailable — Google Play services status $gms")
             _availability.value = AdapterAvailability.Unavailable(
                 "Google Cast needs Google Play services, which is missing or out of date on this phone.",
             )
@@ -106,6 +109,7 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
                 .addOnSuccessListener { onCastReady(it) }
                 .addOnFailureListener { e ->
                     Log.w(TAG, "Cast framework failed to initialise", e)
+                    Diagnostics.set("cast.state", "failed to start: ${e.javaClass.simpleName}: ${e.message}")
                     _availability.value = AdapterAvailability.Unavailable("Google Cast couldn't start on this phone.")
                 }
         } catch (e: Exception) {
@@ -120,6 +124,7 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
         selector = ctx.mergedSelector
         ctx.sessionManager.addSessionManagerListener(sessionListener, CastSession::class.java)
         _availability.value = AdapterAvailability.Ready
+        Diagnostics.set("cast.state", "ready, receiver ${CastOptionsProvider.RECEIVER_APP_ID}, selector ${selector != null}")
         ctx.sessionManager.currentCastSession?.takeIf { it.isConnected }?.let { existing ->
             attach(existing)
             _connection.value = ConnectionState.Connected(endpointFor(existing))
@@ -152,15 +157,18 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
         var flags = MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY
         if (activeScan) flags = flags or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN
         r.addCallback(sel, routerCallback, flags)
+        Diagnostics.event("Cast discovery on (active scan: $activeScan)")
         refreshRoutes()
     }
 
     private fun refreshRoutes() {
         val r = router ?: return
         val sel = selector ?: return
-        _endpoints.value = r.routes
-            .filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(sel) }
-            .mapNotNull { toEndpoint(it) }
+        val all = r.routes
+        val cast = all.filter { !it.isDefault && !it.isBluetooth && it.isEnabled && it.matchesSelector(sel) }
+        _endpoints.value = cast.mapNotNull { toEndpoint(it) }
+        Diagnostics.set("cast.routes", "${all.size} on phone, ${cast.size} Cast (${cast.joinToString { it.name }})")
+        Diagnostics.set("cast.castRouteCount", cast.size.toString())
     }
 
     private fun toEndpoint(route: MediaRouter.RouteInfo): ReceiverEndpoint? {
@@ -266,6 +274,7 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
             val ep = endpointFor(session)
             detach()
             Log.w(TAG, "Session start failed: ${CastStatusCodes.getStatusCodeString(error)}")
+            Diagnostics.event("Cast session start failed: ${CastStatusCodes.getStatusCodeString(error)}")
             if (_connection.value !is ConnectionState.Failed) {
                 _connection.value = ConnectionState.Failed(ep, connectFailure(error, ep.name))
             }

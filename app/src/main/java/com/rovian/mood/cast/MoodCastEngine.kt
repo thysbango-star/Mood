@@ -205,10 +205,25 @@ class MoodCastEngine(
         scope.launch {
             val endpoint = requireConnected() ?: return@launch
             runPreparation("Starting ${movie.title}…") {
-                val choice = MoodFit.choose(movie, endpoint)
-                    ?: throw CastException("${endpoint.name} can't play ${movie.title} in any format it's offered in.")
-                _fitNote.value = choice.explanation
-                send(endpoint, listOf(MoodFit.toCastMedia(movie, choice.stream)))
+                val choices = MoodFit.ranked(movie, endpoint)
+                if (choices.isEmpty()) {
+                    throw CastException("${endpoint.name} can't play ${movie.title} in any format it's offered in.")
+                }
+                // Check from the phone that the stream really exists before the TV is asked to play it,
+                // and fall back through the alternatives if one is dead or rejected.
+                var lastError: Throwable? = null
+                for (choice in choices) {
+                    if (!resolver.isReachable(choice.stream.url)) {
+                        Log.w(TAG, "Stream unreachable: ${choice.stream.url}")
+                        lastError = CastException("${movie.title} isn't available from its host right now.")
+                        continue
+                    }
+                    _fitNote.value = choice.explanation
+                    val result = runCatching { send(endpoint, listOf(MoodFit.toCastMedia(movie, choice.stream))) }
+                    if (result.isSuccess) return@runPreparation
+                    lastError = result.exceptionOrNull()
+                }
+                throw lastError ?: CastException("Couldn't start ${movie.title}.")
             }
         }
     }
