@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ always shows a system splash. We make it a plain paper
+         frame (no icon) so it is indistinguishable from frame 0 of the Mood
+         launch animation, avoiding a "double splash". -->
+    <style name="Theme.Mood" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/mood_paper</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenBackground">@color/mood_paper</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+    </style>
+</resources>

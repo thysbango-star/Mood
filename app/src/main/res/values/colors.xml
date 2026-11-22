@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Paper tone sampled from the official wordmark artwork. The window
+         background uses it so the system splash hands over to the launch
+         animation's first frame without a visible seam. -->
+    <color name="mood_paper">#FFEDEEE9</color>
+    <color name="mood_night">#FF0B0B0C</color>
+    <color name="ic_launcher_background">#FF0B0B0C</color>
+</resources>

@@ -1,0 +1,54 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon testDebugUnitTest
+
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mood-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Rolling pre-release so the newest APK is always one tap away on a phone:
+      # https://github.com/<owner>/<repo>/releases/tag/latest-debug
+      - name: Publish rolling "latest-debug" release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk mood-debug.apk
+          gh release delete latest-debug --yes --cleanup-tag || true
+          gh release create latest-debug mood-debug.apk \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Mood — latest debug build" \
+            --notes "Debug APK built from ${GITHUB_SHA::7}. Install on Android 8.0+ (allow installs from your browser when prompted)."

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The wordmark's signature 'o': outlined capsule holding the red-orange
+     gradient capsule. Proportions match MoodLogoGeometry. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M40,46 H68 A8,8 0 0 1 68,62 H40 A8,8 0 0 1 40,46 Z"
+        android:strokeWidth="2.2"
+        android:strokeColor="#FFF3F2EE"
+        android:fillColor="#00000000" />
+    <path android:pathData="M40.75,48.85 H67.25 A5.15,5.15 0 0 1 67.25,59.15 H40.75 A5.15,5.15 0 0 1 40.75,48.85 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="35.6"
+                android:startY="54"
+                android:endX="72.4"
+                android:endY="54"
+                android:startColor="#FFFF3038"
+                android:endColor="#FFFF7738" />
+        </aapt:attr>
+    </path>
+</vector>
