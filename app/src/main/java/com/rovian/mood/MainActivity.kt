@@ -53,6 +53,8 @@ class MainActivity : ComponentActivity() {
         if (uris.isNotEmpty()) castPicked(uris, MediaKind.AUDIO)
     }
 
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     private fun castPicked(uris: List<android.net.Uri>, kind: MediaKind) {
         app.castEngine.castUris(uris, kind)
         controllerVisible = true
@@ -83,6 +85,11 @@ class MainActivity : ComponentActivity() {
         }
 
         override fun replayIntro() = replayLaunch()
+
+        override fun enableMediaAccess() {
+            if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            runCatching { startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,6 +116,7 @@ class MainActivity : ComponentActivity() {
                         mirroring = app.mirroring,
                         networkCheck = app.networkCheck,
                         tvDisplay = app.tvDisplay,
+                        mediaWatcher = app.mediaWatcher,
                         platform = platform,
                         showController = controllerVisible,
                         onShowController = { controllerVisible = it },
@@ -131,6 +139,7 @@ class MainActivity : ComponentActivity() {
         // Discover only while Mood is on screen; sessions continue in the background.
         app.castEngine.startDiscovery()
         app.tvDisplay.attach(this)
+        app.mediaWatcher.refresh()
         val since = backgroundedAt
         backgroundedAt = 0L
         if (since > 0L && SystemClock.elapsedRealtime() - since >= REPLAY_AFTER_BACKGROUND_MS) {

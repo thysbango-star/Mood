@@ -56,6 +56,7 @@ import com.rovian.mood.cast.endpoint
 import com.rovian.mood.cast.hasSession
 import com.rovian.mood.cast.media.MediaResolver
 import com.rovian.mood.cast.mirror.DisplayAdapter
+import com.rovian.mood.cast.mirror.MediaSessionWatcher
 import com.rovian.mood.cast.mirror.SystemMirroring
 import com.rovian.mood.cast.CastProtocol
 import com.rovian.mood.catalog.CatalogHome
@@ -109,6 +110,7 @@ interface PlatformActions {
     fun openMirroring()
     fun openWifiSettings()
     fun replayIntro()
+    fun enableMediaAccess()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -121,6 +123,7 @@ fun MoodShell(
     mirroring: SystemMirroring,
     networkCheck: NetworkCheck,
     tvDisplay: DisplayAdapter,
+    mediaWatcher: MediaSessionWatcher,
     platform: PlatformActions,
     showController: Boolean,
     onShowController: (Boolean) -> Unit,
@@ -136,6 +139,8 @@ fun MoodShell(
     val availability by engine.availability.collectAsState()
     val networkState by network.state.collectAsState()
     val external by mirroring.externalDisplay.collectAsState()
+    val otherApp by mediaWatcher.active.collectAsState()
+    val mediaAccess by mediaWatcher.accessGranted.collectAsState()
 
     var tab by rememberSaveable { mutableStateOf(Tab.HOME) }
     var infoMovie by remember { mutableStateOf<Movie?>(null) }
@@ -255,6 +260,9 @@ fun MoodShell(
             override fun enterLink() { linkDialog = true }
             override fun openController() = onShowController(true)
             override fun mirror() = platform.openMirroring()
+            override fun enableMediaAccess() = platform.enableMediaAccess()
+            override fun toggleOtherApp() = mediaWatcher.togglePlay()
+            override fun openOtherApp(packageName: String) = mediaWatcher.openApp(packageName)
         }
     }
 
@@ -277,7 +285,7 @@ fun MoodShell(
                 )
                 Tab.SEARCH -> SearchScreen(query, { query = it }, results, searchingCatalog, contentStart, onOpen = { infoMovie = it })
                 Tab.SCREENS -> ScreensScreen(
-                    ScreensState(networkState, discovery, searching, devices, recents, connection, playback, preparing, availability, external),
+                    ScreensState(networkState, discovery, searching, devices, recents, connection, playback, preparing, availability, external, otherApp, mediaAccess),
                     screensActions,
                     contentStart,
                 )
@@ -444,7 +452,7 @@ private fun AmbientBackdrop(url: String?) {
 
 /** Logo on the left; one floating glass capsule of navigation on the right. */
 @Composable
-private fun TopBar(tab: Tab, connection: ConnectionState, wide: Boolean, modifier: Modifier, onTab: (Tab) -> Unit) {
+internal fun TopBar(tab: Tab, connection: ConnectionState, wide: Boolean, modifier: Modifier, onTab: (Tab) -> Unit) {
     Row(
         modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = if (wide) 40.dp else 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -161,30 +161,7 @@ class UiScreenshots {
         MoodTheme {
             Box(Modifier.fillMaxSize().background(MoodColors.Night)) {
                 content()
-                if (wide) {
-                    Box(
-                        Modifier.align(Alignment.CenterStart).padding(start = 16.dp)
-                            .liquidGlass(RoundedCornerShape(50)).padding(8.dp),
-                    ) {
-                        androidx.compose.foundation.layout.Column {
-                            listOf(Glyph.Home, Glyph.Search, Glyph.Screen).forEach {
-                                Box(Modifier.padding(11.dp)) { MoodIcon(it, size = 22.dp) }
-                            }
-                        }
-                    }
-                } else {
-                    androidx.compose.foundation.layout.Row(
-                        Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
-                            .liquidGlass(RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 6.dp),
-                    ) {
-                        listOf(Glyph.Home, Glyph.Search, Glyph.Screen).forEach {
-                            Box(Modifier.padding(11.dp)) { MoodIcon(it, size = 22.dp) }
-                        }
-                    }
-                }
-                if (chip) Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp).liquidGlass(RoundedCornerShape(50)).padding(10.dp)) {
-                    MoodIcon(Glyph.Screen, size = 20.dp)
-                }
+                com.rovian.mood.ui.shell.TopBar(com.rovian.mood.ui.shell.Tab.HOME, ConnectionState.Idle, wide, Modifier.align(Alignment.TopCenter)) {}
             }
         }
     }

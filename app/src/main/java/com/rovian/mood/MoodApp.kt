@@ -36,6 +36,8 @@ class MoodApp : Application() {
         private set
     lateinit var tvDisplay: DisplayAdapter
         private set
+    lateinit var mediaWatcher: com.rovian.mood.cast.mirror.MediaSessionWatcher
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -44,6 +46,7 @@ class MoodApp : Application() {
         mirroring = SystemMirroring(this)
         networkCheck = NetworkCheck(this, networkMonitor, mirroring)
         tvDisplay = DisplayAdapter(this, mirroring)
+        mediaWatcher = com.rovian.mood.cast.mirror.MediaSessionWatcher(this, mirroring)
         val googleCast = GoogleCastAdapter(this)
         val dlna = DlnaAdapter(this, networkMonitor)
         castEngine = MoodCastEngine(

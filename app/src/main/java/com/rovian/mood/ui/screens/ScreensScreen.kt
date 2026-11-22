@@ -64,6 +64,8 @@ data class ScreensState(
     val preparing: String?,
     val availability: Map<CastProtocol, AdapterAvailability>,
     val externalDisplay: String?,
+    val otherApp: com.rovian.mood.cast.mirror.ExternalPlayback? = null,
+    val mediaAccess: Boolean = false,
 )
 
 interface ScreensActions {
@@ -78,6 +80,9 @@ interface ScreensActions {
     fun enterLink()
     fun openController()
     fun mirror()
+    fun enableMediaAccess() {}
+    fun toggleOtherApp() {}
+    fun openOtherApp(packageName: String) {}
 }
 
 fun ReceiverEndpoint.summary(): String {
@@ -108,6 +113,7 @@ fun ScreensScreen(state: ScreensState, actions: ScreensActions, contentStart: Dp
         item { SessionCard(state, actions) }
         item { DeviceSection(state, actions) }
         item { MirrorCard(state.externalDisplay, actions) }
+        item { OtherAppsCard(state, actions) }
     }
 }
 
@@ -294,6 +300,49 @@ private fun MirrorCard(externalDisplay: String?, actions: ScreensActions) {
         }
         ActionPill(Glyph.Mirror, "Open screen mirroring", actions::mirror)
     }
+}
+
+@Composable
+private fun OtherAppsCard(state: ScreensState, actions: ScreensActions) {
+    GlassCard(title = "YouTube & other apps") {
+        val other = state.otherApp
+        when {
+            !state.mediaAccess -> {
+                Text(
+                    "Let Mood notice when YouTube, Netflix and other apps are playing while you mirror, and tell you " +
+                        "how to get full TV quality. Mood only reads what's playing — never your notifications' content.",
+                    color = MoodColors.InkSecondary, fontSize = 14.sp, lineHeight = 19.sp,
+                )
+                ActionPill(Glyph.Video, "Turn on", actions::enableMediaAccess)
+            }
+            other == null -> Text("Nothing is playing in other apps right now.", color = MoodColors.InkSecondary, fontSize = 14.sp)
+            else -> {
+                Text(
+                    "${other.appName}${other.title?.let { " · $it" } ?: ""}",
+                    color = MoodColors.Ink, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1,
+                )
+                Text(
+                    if (state.externalDisplay != null) {
+                        "You're mirroring, which sends a compressed copy of your screen. Tap Cast inside ${other.appName} " +
+                            "and the TV plays it itself — sharper picture, TV sound, no stutter."
+                    } else {
+                        "For the best picture on the TV, use the Cast button inside ${other.appName}."
+                    },
+                    color = MoodColors.InkSecondary, fontSize = 14.sp, lineHeight = 19.sp,
+                )
+                FlowRowCompat {
+                    ActionPill(if (other.playing) Glyph.Pause else Glyph.Play, if (other.playing) "Pause" else "Play", actions::toggleOtherApp)
+                    ActionPill(Glyph.Screen, "Open ${other.appName}", { actions.openOtherApp(other.packageName) })
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun FlowRowCompat(content: @Composable () -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
 }
 
 @Composable
