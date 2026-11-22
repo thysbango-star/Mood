@@ -24,6 +24,7 @@ import com.rovian.mood.ui.theme.MoodColors
 enum class Glyph {
     Play, Pause, Next, Previous, Back10, Forward10, Shuffle, Repeat, RepeatOne,
     Volume, VolumeOff, Close, ChevronDown, Screen, Video, Photo, Music, Link, Mirror, Refresh, Stop,
+    Search, Home, Info, Wifi,
 }
 
 @Composable
@@ -121,5 +122,23 @@ private fun DrawScope.drawGlyph(g: Glyph, c: Color) {
             drawLine(c, Offset(6f, 18.5f), Offset(12f, 18.5f), 1.9f, StrokeCap.Round)
         }
         Glyph.Refresh -> arrowArc(c, clockwise = true)
+        Glyph.Search -> {
+            drawCircle(c, 6.5f, Offset(10.5f, 10.5f), style = line)
+            drawLine(c, Offset(15.3f, 15.3f), Offset(20f, 20f), 1.9f, StrokeCap.Round)
+        }
+        Glyph.Home -> {
+            drawCircle(c, 8.5f, Offset(12f, 12f), style = line)
+            drawPath(path { moveTo(10f, 8.3f); lineTo(15.5f, 12f); lineTo(10f, 15.7f); close() }, c)
+        }
+        Glyph.Info -> {
+            drawCircle(c, 8.5f, Offset(12f, 12f), style = line)
+            drawLine(c, Offset(12f, 11f), Offset(12f, 16f), 1.9f, StrokeCap.Round)
+            drawCircle(c, 1.2f, Offset(12f, 8f))
+        }
+        Glyph.Wifi -> {
+            drawArc(c, -135f, 90f, false, Offset(3f, 5f), Size(18f, 18f), style = line)
+            drawArc(c, -135f, 90f, false, Offset(6.5f, 8.5f), Size(11f, 11f), style = line)
+            drawCircle(c, 1.4f, Offset(12f, 17.5f))
+        }
     }
 }

@@ -3,6 +3,8 @@ package com.rovian.mood.cast
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.rovian.mood.catalog.Movie
+import com.rovian.mood.catalog.MoodFit
 import com.rovian.mood.cast.media.ByteArrayContent
 import com.rovian.mood.cast.media.LocalMediaServer
 import com.rovian.mood.cast.media.MediaResolver
@@ -180,6 +182,7 @@ class MoodCastEngine(
         scope.launch {
             val endpoint = requireConnected() ?: return@launch
             runPreparation(if (uris.size == 1) "Preparing…" else "Preparing ${uris.size} items…") {
+                _fitNote.value = null
                 val medias = uris.mapNotNull { uri ->
                     try {
                         resolver.fromUri(uri, hint)
@@ -189,6 +192,23 @@ class MoodCastEngine(
                     }
                 }
                 send(endpoint, medias)
+            }
+        }
+    }
+
+    private val _fitNote = MutableStateFlow<String?>(null)
+    /** Why MoodFit picked the stream currently playing (shown in the controller). */
+    val fitNote: StateFlow<String?> = _fitNote.asStateFlow()
+
+    /** Sends a catalogue movie to the connected screen, picking the stream with [MoodFit]. */
+    fun castMovie(movie: Movie) {
+        scope.launch {
+            val endpoint = requireConnected() ?: return@launch
+            runPreparation("Starting ${movie.title}…") {
+                val choice = MoodFit.choose(movie, endpoint)
+                    ?: throw CastException("${endpoint.name} can't play ${movie.title} in any format it's offered in.")
+                _fitNote.value = choice.explanation
+                send(endpoint, listOf(MoodFit.toCastMedia(movie, choice.stream)))
             }
         }
     }
@@ -259,7 +279,7 @@ class MoodCastEngine(
 
     private suspend fun resolve(media: CastMedia, convertTo: String?): ResolvedMedia {
         return when (val source = media.source) {
-            is MediaSource.Remote -> ResolvedMedia(media, source.url, media.mimeType)
+            is MediaSource.Remote -> ResolvedMedia(media, source.url, media.mimeType, media.artworkUrl)
             is MediaSource.Local -> {
                 val info = network.local.value
                     ?: throw CastException("Join the same Wi-Fi as the TV to cast files from this phone.")

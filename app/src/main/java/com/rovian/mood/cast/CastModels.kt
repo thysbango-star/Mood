@@ -69,6 +69,8 @@ data class CastMedia(
     val source: MediaSource,
     val durationMs: Long? = null,
     val subtitle: String? = null,
+    /** Poster/artwork URL the receiver and the controller can show. */
+    val artworkUrl: String? = null,
     val id: String = UUID.randomUUID().toString(),
 )
 
