@@ -42,7 +42,7 @@ class MoodApp : Application() {
             context = this,
             network = networkMonitor,
             adapters = listOf(googleCast, dlna),
-            server = LocalMediaServer(),
+            server = LocalMediaServer { msg, e -> android.util.Log.i("MoodMediaServer", msg, e) },
             resolver = mediaResolver,
             recents = RecentDevices(this),
             scope = mainScope,

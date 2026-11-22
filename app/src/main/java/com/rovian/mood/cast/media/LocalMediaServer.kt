@@ -1,6 +1,5 @@
 package com.rovian.mood.cast.media
 
-import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayInputStream
@@ -84,7 +83,10 @@ sealed interface ByteRange {
  * Supports GET/HEAD and byte ranges, which video seeking on TVs depends on, and
  * sends the DLNA transfer headers some smart TVs require.
  */
-class LocalMediaServer {
+class LocalMediaServer(
+    /** Diagnostic sink; Android wiring passes Logcat. Never shown to users. */
+    private val log: (message: String, error: Throwable?) -> Unit = { _, _ -> },
+) {
     private val random = SecureRandom()
     private val items = ConcurrentHashMap<String, ServableContent>()
     private val ids = AtomicInteger(0)
@@ -110,10 +112,10 @@ class LocalMediaServer {
             boundAddress = address
             workers = pool
             Thread({ acceptLoop(socket, pool) }, "mood-media-accept").apply { isDaemon = true }.start()
-            Log.i(TAG, "Serving media on ${address.hostAddress}:${socket.localPort}")
+            log("Serving media on ${address.hostAddress}:${socket.localPort}", null)
             true
         } catch (e: IOException) {
-            Log.w(TAG, "Could not start media server", e)
+            log("Could not start media server", e)
             false
         }
     }
@@ -171,7 +173,7 @@ class LocalMediaServer {
             } catch (e: SocketException) {
                 // Receiver closed the connection (normal while seeking).
             } catch (e: IOException) {
-                Log.d(TAG, "Media request ended: ${e.message}")
+                log("Media request ended: ${e.message}", null)
             }
         }
     }
@@ -279,7 +281,6 @@ class LocalMediaServer {
     }
 
     companion object {
-        private const val TAG = "MoodMediaServer"
         const val DLNA_FEATURES = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
     }
 }
