@@ -64,7 +64,7 @@ class UiScreenshots {
 
     private val home = runBlocking { OpenFilmsCatalog().home() }
 
-    init {
+    private fun primeArtwork() {
         val all = home.rows.flatMap { it.movies } + home.featured
         all.forEachIndexed { i, m ->
             val art = artwork(1280, 720, i)
@@ -187,29 +187,39 @@ class UiScreenshots {
     }
 
     @Test
-    fun home_phone() = paparazzi.snapshot {
+    fun home_phone() {
+        primeArtwork()
+        paparazzi.snapshot {
         Frame(wide = false) { CatalogScreen(home, null, "Watch", 24.dp, {}, {}) }
+        }
     }
 
     @Test
     fun home_tablet() {
         paparazzi.unsafeUpdateConfig(DeviceConfig.PIXEL_C.copy(orientation = ScreenOrientation.LANDSCAPE))
+        primeArtwork()
         paparazzi.snapshot { Frame(wide = true) { CatalogScreen(home, null, "Watch", 104.dp, {}, {}) } }
     }
 
     @Test
-    fun screens_searching_connected() = paparazzi.snapshot {
+    fun screens_searching_connected() {
+        primeArtwork()
+        paparazzi.snapshot {
         Frame(wide = false) { ScreensScreen(screens(ConnectionState.Connected(livingRoom)), noScreens, 24.dp) }
+        }
     }
 
     @Test
-    fun screens_failed() = paparazzi.snapshot {
+    fun screens_failed() {
+        primeArtwork()
+        paparazzi.snapshot {
         Frame(wide = false) {
             ScreensScreen(
                 screens(ConnectionState.Failed(bedroom, "[TV] Bedroom didn't answer. Make sure it's on, and that media sharing (DLNA) is allowed in the TV's settings.")),
                 noScreens,
                 24.dp,
             )
+        }
         }
     }
 
@@ -227,23 +237,29 @@ class UiScreenshots {
     )
 
     @Test
-    fun controller_cast_video() = paparazzi.snapshot {
+    fun controller_cast_video() {
+        primeArtwork()
+        paparazzi.snapshot {
         MoodTheme {
             ControllerScreen(
                 ConnectionState.Connected(livingRoom), playing, null,
                 "Adaptive stream — Living Room TV picks the best quality for its screen and connection.", null, noController,
             )
         }
+        }
     }
 
     @Test
-    fun controller_dlna_no_pause() = paparazzi.snapshot {
+    fun controller_dlna_no_pause() {
+        primeArtwork()
+        paparazzi.snapshot {
         MoodTheme {
             ControllerScreen(
                 ConnectionState.Connected(bedroom),
                 playing.copy(commands = setOf(Command.PLAY, Command.STOP, Command.NEXT, Command.PREVIOUS, Command.REPEAT), queueSize = 3),
                 null, null, null, noController,
             )
+        }
         }
     }
 }
