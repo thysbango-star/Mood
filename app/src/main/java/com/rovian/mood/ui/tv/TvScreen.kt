@@ -47,13 +47,16 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.rovian.mood.brand.MoodWordmark
 import com.rovian.mood.cast.MediaKind
+import com.rovian.mood.cast.PlayerStatus
 import com.rovian.mood.cast.ResolvedMedia
 import com.rovian.mood.cast.mirror.DisplayAdapter
 import com.rovian.mood.cast.mirror.TvPlayerBridge
 import com.rovian.mood.cast.mirror.TvScene
 import com.rovian.mood.catalog.Movie
 import com.rovian.mood.ui.catalog.meta
+import com.rovian.mood.ui.components.CapsuleProgress
 import com.rovian.mood.ui.components.MoodGradient
+import com.rovian.mood.ui.components.formatTime
 import com.rovian.mood.ui.components.RemoteImage
 import com.rovian.mood.ui.components.liquidGlass
 import com.rovian.mood.ui.theme.MoodColors
@@ -170,6 +173,40 @@ private fun TvPlaying(scene: TvScene.Playing, adapter: DisplayAdapter, maxSide: 
                 Column(Modifier.align(Alignment.BottomStart).padding(64.dp)) {
                     Text(item.media.title, color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.Bold)
                     item.media.subtitle?.let { Text(it, color = Color.White.copy(alpha = 0.8f), fontSize = 24.sp) }
+                }
+            }
+        }
+        val playback by adapter.playback.collectAsState()
+        val pb = playback
+        AnimatedVisibility(
+            visible = item.media.kind != MediaKind.IMAGE && (showTitle || pb?.status != PlayerStatus.PLAYING),
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) {
+            Column(Modifier.fillMaxWidth().background(Color.Black).padding(horizontal = 96.dp, vertical = 28.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(item.media.title, color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                    Text(
+                        when (pb?.status) {
+                            PlayerStatus.PAUSED -> "Paused"
+                            PlayerStatus.LOADING, PlayerStatus.BUFFERING -> "Loading…"
+                            PlayerStatus.ERROR -> pb.error ?: "Playback problem"
+                            else -> ""
+                        },
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 20.sp,
+                    )
+                }
+                val d = pb?.durationMs
+                if (pb != null && d != null && d > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(formatTime(pb.positionMs), color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
+                        Box(Modifier.weight(1f).padding(horizontal = 20.dp)) {
+                            CapsuleProgress(pb.positionMs, d, seekable = false, onSeek = {}, onInteract = {})
+                        }
+                        Text(formatTime(d), color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
+                    }
                 }
             }
         }

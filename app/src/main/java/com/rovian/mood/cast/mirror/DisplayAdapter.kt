@@ -328,7 +328,11 @@ class DisplayAdapter(context: Context, private val mirroring: SystemMirroring) :
     }
 
     override fun seekTo(positionMs: Long) {
-        bridge.view?.seekTo(positionMs.toInt())
+        if (status == PlayerStatus.LOADING) {
+            bridge.resumeAtMs = positionMs // applied the moment the TV-side player is ready
+        } else {
+            bridge.view?.seekTo(positionMs.toInt())
+        }
         publish()
     }
 

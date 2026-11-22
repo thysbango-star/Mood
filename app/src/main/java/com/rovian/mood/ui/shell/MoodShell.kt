@@ -269,7 +269,22 @@ fun MoodShell(
                 },
             )
         }
-        phoneMovie?.let { m -> PhonePlayer(m.streams.sortedBy { it.adaptive }.map { it.url }, m.title) { phoneMovie = null } }
+        phoneMovie?.let { m ->
+            val tvName = (connection as? ConnectionState.Connected)?.endpoint
+                ?.takeIf { it.protocol == CastProtocol.SCREEN }?.name
+            PhonePlayer(
+                urls = m.streams.sortedBy { it.adaptive }.map { it.url },
+                title = m.title,
+                subtitle = m.meta(),
+                tvName = tvName,
+                onHandOffToTv = { at ->
+                    phoneMovie = null
+                    engine.castMovie(m, startAtMs = at)
+                    onShowController(true)
+                },
+                onClose = { phoneMovie = null },
+            )
+        }
     }
 
     infoMovie?.let { movie ->
@@ -290,7 +305,10 @@ fun MoodShell(
                         Spacer(Modifier.width(8.dp))
                         Text(connectedName?.let { "Watch on $it" } ?: "Watch on TV", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     }
-                    GlassPill(onClick = { infoMovie = null; phoneMovie = movie }) {
+                    GlassPill(onClick = {
+                        infoMovie = null
+                        if ((connection as? ConnectionState.Connected)?.endpoint?.protocol == CastProtocol.SCREEN) watch(movie) else phoneMovie = movie
+                    }) {
                         Text("Play on phone", color = Color.White, fontSize = 16.sp)
                     }
                 }

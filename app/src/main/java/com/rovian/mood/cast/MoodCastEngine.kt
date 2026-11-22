@@ -201,7 +201,7 @@ class MoodCastEngine(
     val fitNote: StateFlow<String?> = _fitNote.asStateFlow()
 
     /** Sends a catalogue movie to the connected screen, picking the stream with [MoodFit]. */
-    fun castMovie(movie: Movie) {
+    fun castMovie(movie: Movie, startAtMs: Long = 0) {
         scope.launch {
             val endpoint = requireConnected() ?: return@launch
             runPreparation("Starting ${movie.title}…") {
@@ -220,7 +220,11 @@ class MoodCastEngine(
                     }
                     _fitNote.value = choice.explanation
                     val result = runCatching { send(endpoint, listOf(MoodFit.toCastMedia(movie, choice.stream))) }
-                    if (result.isSuccess) return@runPreparation
+                    if (result.isSuccess) {
+                        // Continue from where the phone was (hand-off).
+                        if (startAtMs > 0) active.value?.seekTo(startAtMs)
+                        return@runPreparation
+                    }
                     lastError = result.exceptionOrNull()
                 }
                 throw lastError ?: CastException("Couldn't start ${movie.title}.")
