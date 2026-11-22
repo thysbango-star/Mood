@@ -72,7 +72,7 @@ import com.rovian.mood.ui.components.LocalHazeState
 import com.rovian.mood.ui.components.floatingGlass
 import com.rovian.mood.brand.MoodWordmark
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.haze
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.animation.Crossfade
@@ -262,7 +262,7 @@ fun MoodShell(
         val wide = maxWidth >= 640.dp
         val contentStart = if (wide) 64.dp else 22.dp
         // Everything the glass navigation floats over is the blur source.
-        Box(Modifier.fillMaxSize().hazeSource(haze)) {
+        Box(Modifier.fillMaxSize().haze(haze)) {
             AmbientBackdrop(ambientUrl)
             when (tab) {
                 Tab.HOME -> CatalogScreen(

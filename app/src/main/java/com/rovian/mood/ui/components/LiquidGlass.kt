@@ -15,7 +15,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
-import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeChild
 
 /**
  * Mood's glass material: a translucent body, a soft specular sheen across the
@@ -75,6 +75,6 @@ fun Modifier.floatingGlass(shape: Shape): Modifier {
     val haze = LocalHazeState.current
     return this
         .clip(shape)
-        .then(if (haze != null) Modifier.hazeEffect(state = haze, style = MoodGlassStyle) else Modifier)
+        .then(if (haze != null) Modifier.hazeChild(state = haze, style = MoodGlassStyle) else Modifier)
         .liquidGlass(shape, strength = 0.9f)
 }
