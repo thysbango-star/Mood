@@ -1,14 +1,15 @@
 package com.rovian.mood.cast.dlna
 
 import com.rovian.mood.cast.MediaKind
-import com.sun.net.httpserver.HttpServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
-import java.net.InetSocketAddress
+import java.net.InetAddress
+import java.net.ServerSocket
+import kotlin.concurrent.thread
 import java.util.Collections
 
 class DlnaProtocolTest {
@@ -94,26 +95,44 @@ class DlnaProtocolTest {
     @Test
     fun soapRoundTripAgainstFakeRenderer() {
         val bodies = Collections.synchronizedList(mutableListOf<Pair<String, String>>())
-        val http = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        http.createContext("/av") { ex ->
-            val action = ex.requestHeaders.getFirst("SOAPACTION").orEmpty()
-            val body = ex.requestBody.readBytes().toString(Charsets.UTF_8)
-            bodies += action to body
-            val (code, reply) = when {
-                action.endsWith("#GetPositionInfo\"") -> 200 to response(
-                    "GetPositionInfo",
-                    "<Track>1</Track><TrackDuration>0:03:00</TrackDuration><RelTime>0:01:15</RelTime><TrackURI>http://h/a.mp4</TrackURI>",
-                )
-                action.endsWith("#Seek\"") -> 500 to fault(710, "Seek mode not supported")
-                else -> 200 to response(action.substringAfter('#').trimEnd('"'), "")
+        val http = ServerSocket(0, 8, InetAddress.getLoopbackAddress())
+        thread(isDaemon = true) {
+            while (!http.isClosed) {
+                val sock = runCatching { http.accept() }.getOrNull() ?: break
+                sock.use { c ->
+                    val input = c.getInputStream().bufferedReader(Charsets.UTF_8)
+                    val headers = mutableMapOf<String, String>()
+                    input.readLine()
+                    while (true) {
+                        val line = input.readLine() ?: break
+                        if (line.isEmpty()) break
+                        val i = line.indexOf(':')
+                        if (i > 0) headers[line.substring(0, i).trim().lowercase()] = line.substring(i + 1).trim()
+                    }
+                    val len = headers["content-length"]?.toInt() ?: 0
+                    val buf = CharArray(len)
+                    var read = 0
+                    while (read < len) { val n = input.read(buf, read, len - read); if (n < 0) break; read += n }
+                    val action = headers["soapaction"].orEmpty()
+                    bodies += action to String(buf, 0, read)
+                    val (code, reply) = when {
+                        action.endsWith("#GetPositionInfo\"") -> 200 to response(
+                            "GetPositionInfo",
+                            "<Track>1</Track><TrackDuration>0:03:00</TrackDuration><RelTime>0:01:15</RelTime><TrackURI>http://h/a.mp4</TrackURI>",
+                        )
+                        action.endsWith("#Seek\"") -> 500 to fault(710, "Seek mode not supported")
+                        else -> 200 to response(action.substringAfter('#').trimEnd('"'), "")
+                    }
+                    val bytes = reply.toByteArray()
+                    val out = c.getOutputStream()
+                    out.write("HTTP/1.1 $code X\r\nContent-Type: text/xml\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray())
+                    out.write(bytes)
+                    out.flush()
+                }
             }
-            val bytes = reply.toByteArray()
-            ex.sendResponseHeaders(code, bytes.size.toLong())
-            ex.responseBody.use { it.write(bytes) }
         }
-        http.start()
         try {
-            val base = "http://127.0.0.1:${http.address.port}"
+            val base = "http://127.0.0.1:${http.localPort}"
             val renderer = DlnaRenderer(
                 "uuid:x", "TV", null, null, "$base/desc",
                 DlnaService("urn:schemas-upnp-org:service:AVTransport:1", "$base/av"), null, null,
@@ -139,7 +158,7 @@ class DlnaProtocolTest {
             assertTrue(setBody.contains("&lt;dc:title&gt;A &amp;amp; B&lt;/dc:title&gt;"))
             assertTrue(bodies[1].second.contains("<Speed>1</Speed>"))
         } finally {
-            http.stop(0)
+            http.close()
         }
     }
 
