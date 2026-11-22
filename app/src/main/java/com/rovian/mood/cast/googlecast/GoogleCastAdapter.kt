@@ -177,16 +177,16 @@ class GoogleCastAdapter(private val context: Context) : CastAdapter {
     }
 
     private fun capabilitiesOf(device: CastDevice, volume: Boolean?): ReceiverCapabilities {
-        val video = device.hasCapability(CastDevice.CAP_VIDEO_OUT)
-        val audio = device.hasCapability(CastDevice.CAP_AUDIO_OUT) || video
+        val video = device.hasCapability(CastDevice.CAPABILITY_VIDEO_OUT)
+        val audio = device.hasCapability(CastDevice.CAPABILITY_AUDIO_OUT) || video
         return ReceiverCapabilities(video = video, audio = audio, image = video, volumeControl = volume)
     }
 
     private fun kindOf(device: CastDevice): ReceiverKind {
         val model = device.modelName.orEmpty()
         return when {
-            device.hasCapability(CastDevice.CAP_MULTIZONE_GROUP) -> ReceiverKind.SPEAKER_GROUP
-            !device.hasCapability(CastDevice.CAP_VIDEO_OUT) -> ReceiverKind.SPEAKER
+            device.hasCapability(CastDevice.CAPABILITY_MULTIZONE_GROUP) -> ReceiverKind.SPEAKER_GROUP
+            !device.hasCapability(CastDevice.CAPABILITY_VIDEO_OUT) -> ReceiverKind.SPEAKER
             model.contains("chromecast", true) || model.contains("google tv streamer", true) -> ReceiverKind.STREAMER
             else -> ReceiverKind.TV
         }
