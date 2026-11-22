@@ -1,39 +1,70 @@
-# Mood
+# MoodPlay
 
-Rovian's wireless casting and screen-sharing platform. Native Android app (Kotlin + Jetpack Compose).
+Rovian's casting platform: find a movie, watch it, and send it (or your own videos, photos and music) to a TV. Native Android app (Kotlin + Jetpack Compose).
 
 ## Get the APK
 
 Every push to `main` is built by GitHub Actions (`.github/workflows/android.yml`):
 
 - **Phone-friendly:** the rolling pre-release **`latest-debug`** under *Releases* always holds the newest `mood-debug.apk`.
-- **Per build:** each workflow run also attaches the APK as the `mood-debug-apk` artifact.
+- **Per build:** each run also attaches the APK as the `mood-debug-apk` artifact.
+- **Screens:** a second job renders the real UI with Paparazzi and pushes the PNGs to the `ci-screens` branch.
 
-Builds are signed with the committed debug key (`app/debug.keystore`), so each new APK installs as an update over the previous one. It is a debug key only and must never be used for a Play Store release.
+Builds are signed with the committed debug key (`app/debug.keystore`), so each new APK installs over the previous one. It is a debug key only and must never be used for a Play Store release.
+
+## Casting architecture
+
+```
+cast/
+  CastAdapter.kt          protocol-agnostic contract (discovery, session, playback)
+  MoodCastEngine.kt       MoodCast Engine: merges adapters, picks pathway, compat-checks, serves files
+  Compatibility.kt        format rules (Cast spec + what DLNA TVs declare), device grouping
+  googlecast/             Google Cast — official Cast Application Framework + MediaRouter
+  dlna/                   DLNA/UPnP AV — SSDP discovery, device description, SOAP control, polling
+  media/LocalMediaServer  token-protected HTTP server with Range support so TVs can stream phone files
+  media/MediaResolver     reads picked files, converts photos (HEIC→JPEG), validates links
+  mirror/SystemMirroring  hands off to Android's own Cast screen; reports external displays
+  service/                foreground service, alive only while a session exists
+catalog/
+  MovieCatalog.kt         provider interface + MoodFit stream selection
+  OpenFilmsCatalog.kt     built-in, openly licensed films (Blender Foundation, CC BY)
+```
+
+**Truthful state.**
+- Google Cast states come only from `SessionManagerListener` and `RemoteMediaClient` callbacks.
+- A DLNA TV shows as "Connected" only after it actually answers an AVTransport request. It is then polled every second, so changes made with the TV remote show up in Mood.
+- Controls appear only when the receiver reports it supports them (for example, DLNA Pause appears only if the TV lists it).
+
+**MoodFit.**
+- With media casting the TV fetches the stream itself, so the phone isn't in the video path.
+- MoodFit sends an adaptive HLS/DASH stream when the receiver plays one. The TV then picks the quality that suits its own screen and connection.
+- Otherwise MoodFit sends the best fixed version the TV says it can play.
+
+**Not built yet:**
+- **Mood Web Receiver** for browser-only TVs. It needs a hosted pairing/signalling service, and it plugs in as another `CastAdapter`.
+- **Mood-native mirroring** (MediaProjection → web receiver). This also depends on the web receiver.
+- **Branded Cast receiver.** It needs a Receiver App ID from the Google Cast Developer Console. Until then Mood uses Google's Default Media Receiver (`CastOptionsProvider.RECEIVER_APP_ID`).
+
+## Test matrix
+
+| Scenario | Status | Notes |
+|---|---|---|
+| Unit: HTTP server ranges/HEAD/404/token revoke | ✅ CI | `LocalMediaServerTest` |
+| Unit: SSDP, device description, SOAP round-trip vs fake renderer, faults | ✅ CI | `DlnaProtocolTest` |
+| Unit: format compatibility, device grouping, MoodFit | ✅ CI | |
+| Google Cast receiver (discover/connect/play/seek/volume) | ⏳ needs hardware | Built on the official SDK; not yet run against a TV |
+| DLNA TV (Samsung/LG/Sony etc.) | ⏳ needs hardware | SOAP flow verified against a fake renderer only |
+| Phone files → TV via local server | ⏳ needs hardware | |
+| Receiver unavailable / TV goes offline | ⏳ needs hardware | Cast: SDK callbacks; DLNA: Reconnecting after 3 failed polls, Disconnected after 15 s |
+| Different Wi-Fi networks | ⏳ | Discovery state shows "join your TV's Wi-Fi" |
+| Sender goes offline | ⏳ | Cast resumes the session via the SDK; DLNA TV keeps playing remote URLs |
+| Unsupported format | ✅ logic in CI | Blocked before sending, with the reason |
+| Network permission denied | n/a on targetSdk 35 | Discovery uses only install-time permissions |
+| Browser receiver, Nude OS sender | ❌ not built | |
 
 ## Launch animation
 
-The official Mood launch animation is a self-contained component in `app/src/main/java/com/rovian/mood/brand/`:
-
-| File | Role |
-|---|---|
-| `MoodLogoGeometry.kt` | Vector geometry of the `mood` wordmark, measured from the master artwork |
-| `launch/MoodLaunchTimeline.kt` | All beats (ms) and easing curves — tune timing here |
-| `launch/MoodLaunchChoreography.kt` | Pure `(time, canvas) → frame` maths, unit-tested |
-| `launch/MoodLaunchAnimation.kt` | Compose renderer (`MoodLaunchAnimation(...)`) |
-| `MoodWordmark.kt` | Static wordmark from the same geometry |
-
-The choreography runs in five phases: the wordmark fades in, the capsule travels through the letters, it expands to fill the screen, it contracts back into the 'o', and the overlay dissolves into the app. Rendering uses scaled vector paths on the hardware canvas, so there is no video and no bitmaps. Values update in the draw phase only, so playback causes no recomposition.
-
-Startup work (`MoodStartup`, registered in `MoodApp`) runs in parallel from process start. The home UI composes underneath the animation from the first frame. The overlay waits at most 1.5 s for startup readiness after its last beat.
-
-When it plays:
-
-- on every fresh launch
-- when Mood is reopened after at least 60 s in the background (`REPLAY_AFTER_BACKGROUND_MS` in `MainActivity`; set it to 0 to replay on every return)
-- when restored after the system killed the process
-
-It does not replay on rotation. With system animations turned off (Accessibility → Remove animations), it resolves straight to the app.
+Lives in `brand/` (`MoodLogoGeometry`, `launch/MoodLaunchTimeline`, `launch/MoodLaunchChoreography`, `launch/MoodLaunchAnimation`). It plays on launch and when Mood is reopened after 60 s in the background (`REPLAY_AFTER_BACKGROUND_MS`).
 
 ## Build locally
 

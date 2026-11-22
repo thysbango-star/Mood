@@ -154,7 +154,7 @@ class UiScreenshots {
     }
 
     @Composable
-    private fun Frame(wide: Boolean, content: @Composable () -> Unit) {
+    private fun Frame(wide: Boolean, chip: Boolean = true, content: @Composable () -> Unit) {
         MoodTheme {
             Box(Modifier.fillMaxSize().background(MoodColors.Night)) {
                 content()
@@ -179,7 +179,7 @@ class UiScreenshots {
                         }
                     }
                 }
-                Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp).liquidGlass(RoundedCornerShape(50)).padding(10.dp)) {
+                if (chip) Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp).liquidGlass(RoundedCornerShape(50)).padding(10.dp)) {
                     MoodIcon(Glyph.Screen, size = 20.dp)
                 }
             }
@@ -205,7 +205,7 @@ class UiScreenshots {
     fun screens_searching_connected() {
         primeArtwork()
         paparazzi.snapshot {
-        Frame(wide = false) { ScreensScreen(screens(ConnectionState.Connected(livingRoom)), noScreens, 24.dp) }
+        Frame(wide = false, chip = false) { ScreensScreen(screens(ConnectionState.Connected(livingRoom)), noScreens, 24.dp) }
         }
     }
 
@@ -213,7 +213,7 @@ class UiScreenshots {
     fun screens_failed() {
         primeArtwork()
         paparazzi.snapshot {
-        Frame(wide = false) {
+        Frame(wide = false, chip = false) {
             ScreensScreen(
                 screens(ConnectionState.Failed(bedroom, "[TV] Bedroom didn't answer. Make sure it's on, and that media sharing (DLNA) is allowed in the TV's settings.")),
                 noScreens,

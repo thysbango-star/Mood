@@ -196,8 +196,10 @@ fun MoodShell(
         }
 
         // Top-right: live connection chip
-        Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
-            ConnectionChip(connection) { tab = Tab.SCREENS }
+        if (tab != Tab.SCREENS) {
+            Row(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(12.dp)) {
+                ConnectionChip(connection) { tab = Tab.SCREENS }
+            }
         }
 
         if (wide) {
